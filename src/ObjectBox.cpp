@@ -3,7 +3,7 @@
 #include "MethodInfo.h"
 #include "Reflection.h"
 
-using namespace Albert;
+using namespace rtti;
 
 TYPE_DEFINE_BEGIN(ObjectBox)
 TYPE_DEFINE_END()

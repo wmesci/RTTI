@@ -2,7 +2,7 @@
 #include "System.h"
 #include <typeinfo>
 
-namespace Albert
+namespace rtti
 {
 namespace
 {
@@ -116,7 +116,7 @@ struct TypeRegister
 
 #define TYPE_DEFINE_BEGIN(cls)                                    \
     template <>                                                   \
-    void Albert::TypeRegister::Register<cls>()                    \
+    void rtti::TypeRegister::Register<cls>()                      \
     {                                                             \
         using HOST = cls;                                         \
         [[maybe_unused]] auto type = typeof(HOST);                \
@@ -139,7 +139,7 @@ struct TypeRegister
 
 #define TYPE_BOXED_BEGIN(cls)                                     \
     template <>                                                   \
-    void Albert::TypeRegister::Register<Albert::Boxed<cls>>()     \
+    void rtti::TypeRegister::Register<rtti::Boxed<cls>>()         \
     {                                                             \
         using HOST = cls;                                         \
         [[maybe_unused]] auto type = typeof(HOST);                \
@@ -164,7 +164,7 @@ struct TypeRegister
 
 #define TYPE_DEFINE_ENUM(cls, ...)                                \
     template <>                                                   \
-    void Albert::TypeRegister::Register<Albert::Boxed<cls>>()     \
+    void rtti::TypeRegister::Register<rtti::Boxed<cls>>()         \
     {                                                             \
         static_assert(std::is_enum_v<cls>);                       \
         using HOST = cls;                                         \
@@ -174,4 +174,4 @@ struct TypeRegister
         type->UnderlyingType = typeof(underlying_type);           \
         MACRO_FOR_EACH(ADD_ENUM_VALUE, __VA_ARGS__)               \
     }
-} // namespace Albert
+} // namespace rtti

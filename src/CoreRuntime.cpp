@@ -2,7 +2,7 @@
 #include "ObjectBox.h"
 #include "CoreRuntime.h"
 
-using namespace Albert;
+using namespace rtti;
 
 void InitCoreType()
 {

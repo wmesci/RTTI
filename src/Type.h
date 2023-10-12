@@ -5,7 +5,7 @@
 #include "EnumInfo.h"
 #include <vector>
 
-namespace Albert
+namespace rtti
 {
 class Type : public Attributable
 {
@@ -180,4 +180,4 @@ inline std::shared_ptr<T> cast(const ObjectPtr& obj)
     return nullptr;
 }
 
-} // namespace Albert
+} // namespace rtti

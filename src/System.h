@@ -42,7 +42,7 @@
 
 using namespace std::string_literals;
 
-namespace Albert
+namespace rtti
 {
 class Object;
 using ObjectPtr = std::shared_ptr<Object>;
@@ -78,4 +78,4 @@ constexpr bool is_object = std::is_base_of<Object, T>::value || std::is_same<Obj
 #define FOR_EACH_HELPER(macro, a1, ...) macro(a1) __VA_OPT__(FOR_EACH_AGAIN PARENS(macro, __VA_ARGS__))
 #define FOR_EACH_AGAIN() FOR_EACH_HELPER
 
-} // namespace Albert
+} // namespace rtti

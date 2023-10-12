@@ -3,7 +3,7 @@
 #include "Object.h"
 #include "ObjectBox.h"
 
-namespace Albert
+namespace rtti
 {
 class DisplayNameAttribute : public Attribute
 {
@@ -63,4 +63,4 @@ public:
         (min)(max);
     }
 };
-} // namespace Albert
+} // namespace rtti

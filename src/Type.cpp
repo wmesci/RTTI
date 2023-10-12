@@ -2,7 +2,7 @@
 #include "MethodInfo.h"
 #include "PropertyInfo.h"
 
-using namespace Albert;
+using namespace rtti;
 
 Type* header = nullptr;
 

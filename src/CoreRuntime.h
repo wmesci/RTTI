@@ -3,7 +3,7 @@
 
 #define INIT_TYPE(...) TypeRegister::Register<typename TypeWarper<__VA_ARGS__>::objtype>()
 
-namespace Albert
+namespace rtti
 {
 class CoreRuntime
 {
@@ -12,4 +12,4 @@ public:
 
     static void UnInit();
 };
-} // namespace Albert
+} // namespace rtti

@@ -1,3 +1,3 @@
 ﻿#include "Attributable.h"
 
-using namespace Albert;
+using namespace rtti;

@@ -3,7 +3,7 @@
 #include "Object.h"
 #include "Reflection.h"
 
-namespace Albert
+namespace rtti
 {
 class ObjectBox : public Object
 {
@@ -143,4 +143,4 @@ inline std::enable_if_t<is_object<typename TypeWarper<remove_cr<T>>::type> && st
 {
     return cast<typename TypeWarper<remove_cr<T>>::type>(ptr);
 }
-} // namespace Albert
+} // namespace rtti

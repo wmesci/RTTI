@@ -2,7 +2,7 @@
 #include "Type.h"
 #include "MethodInfo.h"
 
-using namespace Albert;
+using namespace rtti;
 
 TYPE_DEFINE_BEGIN(Object)
 TYPE_DEFINE_END()

@@ -4,7 +4,7 @@
 #include "ObjectBox.h"
 #include "Attributable.h"
 
-namespace Albert
+namespace rtti
 {
 template <typename T, bool isobj = std::is_convertible_v<remove_cr<T>, ObjectPtr>>
 struct wrap_reference
@@ -269,4 +269,4 @@ ObjectPtr constructor(Args... args)
 }
 
 #define CONSTRUCTOR(...) ConstructorInfo::Register<HOST, __VA_ARGS__>(&constructor<HOST, __VA_ARGS__>, {})
-} // namespace Albert
+} // namespace rtti

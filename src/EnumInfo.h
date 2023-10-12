@@ -1,7 +1,7 @@
 #pragma once
 #include "Object.h"
 
-namespace Albert
+namespace rtti
 {
 struct EnumInfo
 {
@@ -9,4 +9,4 @@ struct EnumInfo
     ObjectPtr value;
     std::string name;
 };
-} // namespace Albert
+} // namespace rtti

@@ -4,7 +4,7 @@
 #include "ObjectBox.h"
 #include "Attributable.h"
 
-namespace Albert
+namespace rtti
 {
 using PropertyGetter = std::function<ObjectPtr(const ObjectPtr&)>;
 using PropertySetter = std::function<void(const ObjectPtr&, const ObjectPtr&)>;
@@ -132,4 +132,4 @@ public:
                                                                                      [](const ObjectPtr& obj) { return Box(getSelf<HOST>(obj)->name); }, \
                                                                                      nullptr,                                                            \
                                                                                      {__VA_ARGS__})
-} // namespace Albert
+} // namespace rtti

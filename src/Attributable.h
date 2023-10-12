@@ -2,7 +2,7 @@
 #include "System.h"
 #include <vector>
 
-namespace Albert
+namespace rtti
 {
 struct Attribute
 {
@@ -47,4 +47,4 @@ public:
     //	return static_cast<T*>(GetAttributeImpl(typeid(T)));
     // }
 };
-} // namespace Albert
+} // namespace rtti

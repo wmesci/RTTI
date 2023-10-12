@@ -1,7 +1,7 @@
 ﻿#pragma once
 #include "System.h"
 
-namespace Albert
+namespace rtti
 {
 class Object
 {
@@ -20,4 +20,4 @@ public:
 public:
     static Type* ClassType();
 };
-} // namespace Albert
+} // namespace rtti

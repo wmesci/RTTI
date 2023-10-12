@@ -1,6 +1,6 @@
 #include "RTTI.h"
 
-using namespace Albert;
+using namespace rtti;
 
 enum class TestEnum
 {
