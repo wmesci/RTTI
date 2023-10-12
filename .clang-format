@@ -1,0 +1,40 @@
+---
+BasedOnStyle: LLVM
+UseTab: Never
+IndentWidth: 4
+TabWidth: 4
+BreakBeforeBraces: Allman
+AllowShortIfStatementsOnASingleLine: false
+AllowShortLambdasOnASingleLine: All
+IndentCaseLabels: true
+IndentPPDirectives: None
+ColumnLimit: 0
+AccessModifierOffset: -4
+SortIncludes: false
+IncludeBlocks: Regroup
+ObjCBlockIndentWidth: 4
+PointerAlignment: Left
+BreakConstructorInitializers: BeforeComma
+AlignAfterOpenBracket: Align
+AlignEscapedNewlines: Left
+AlignConsecutiveAssignments: false
+AllowShortFunctionsOnASingleLine: Inline
+CommentPragmas:  '^ IWYU pragma:'
+BraceWrapping:                         
+  AfterClass:            true   
+  AfterControlStatement: true
+  AfterEnum:             true
+  AfterFunction:         true          
+  AfterNamespace:        true                
+  AfterStruct:           true
+  AfterUnion:            true
+  BeforeCatch:           true
+  BeforeElse:            true   
+  IndentBraces:          true
+  BeforeLambdaBody:      false
+BreakBeforeBraces: Allman
+MacroBlockBegin: '(TYPE_DEFINE_BEGIN)'
+MacroBlockEnd: '(ENUM_END|TYPE_DEFINE_END)'
+# > llvm v6.0.0
+BreakInheritanceList: BeforeComma
+AlwaysBreakTemplateDeclarations: Yes
