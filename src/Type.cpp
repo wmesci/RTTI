@@ -6,32 +6,16 @@ using namespace rtti;
 
 Type* header = nullptr;
 
-Type::Type(size_t size, bool is_trivially_copyable, Type* baseType)
-    : Attributable()
+Type::Type(size_t size, uint32_t flags, Type* baseType)
+    : Attributable({})
     , m_name("Object"s)
     , m_size(size)
-    , is_trivially_copyable(is_trivially_copyable)
+    , m_flags(flags)
     , m_baseType(baseType)
     , next(header)
 {
     header = this;
 }
-
-// Attribute* Type::GetAttributeImpl(const std::type_info& type) const
-//{
-//     auto curType = this;
-//     while (curType != nullptr)
-//     {
-//         for (const auto& attr : curType->Attributes)
-//         {
-//             if ((curType == this || attr->Inheritable) && typeid(*attr) == type)
-//                 return attr;
-//         }
-//
-//         curType = curType->GetBaseType();
-//     }
-//     return nullptr;
-// }
 
 const std::string& Type::GetName() const
 {
@@ -62,18 +46,18 @@ bool Type::IsBoxedType() const
 
 bool Type::IsEnum() const
 {
-    return UnderlyingType != nullptr && EnumValues.size() > 0;
+    return m_underlyingType != nullptr && m_enumValues.size() > 0;
 }
 
 const std::vector<EnumInfo>& Type::GetEnumInfos() const
 {
-    return EnumValues;
+    return m_enumValues;
 }
 
 bool Type::GetEnumInfo(const std::string& name, EnumInfo* pInfo) const
 {
     assert(IsEnum());
-    for (auto&& i : EnumValues)
+    for (auto&& i : m_enumValues)
     {
         if (i.name == name)
         {
@@ -87,7 +71,7 @@ bool Type::GetEnumInfo(const std::string& name, EnumInfo* pInfo) const
 bool Type::GetEnumInfo(const int64_t& number, EnumInfo* pInfo) const
 {
     assert(IsEnum());
-    for (auto&& i : EnumValues)
+    for (auto&& i : m_enumValues)
     {
         if (i.number == number)
         {
@@ -100,7 +84,7 @@ bool Type::GetEnumInfo(const int64_t& number, EnumInfo* pInfo) const
 
 Type* Type::GetEnumUnderlyingType() const
 {
-    return UnderlyingType;
+    return m_underlyingType;
 }
 
 bool Type::IsCompatible(Type* type) const
@@ -121,9 +105,9 @@ bool Type::IsCompatible(Object* obj) const
 
 ObjectPtr Type::CreateInstance(const std::vector<ObjectPtr>& args) const
 {
-    for (int i = 0; i < Constructors.size(); i++)
+    for (int i = 0; i < m_constructors.size(); i++)
     {
-        auto ctor = Constructors[i];
+        auto ctor = m_constructors[i];
         if (ctor->GetParameters().size() == args.size())
         {
             bool ok = true;
@@ -158,14 +142,14 @@ ObjectPtr Type::CreateInstance(const std::vector<ObjectPtr>& args) const
 
 const std::vector<ConstructorInfo*>& Type::GetConstructors() const
 {
-    return Constructors;
+    return m_constructors;
 }
 
 ConstructorInfo* Type::GetConstructor() const
 {
-    for (int i = 0; i < Constructors.size(); i++)
+    for (int i = 0; i < m_constructors.size(); i++)
     {
-        auto ctor = Constructors[i];
+        auto ctor = m_constructors[i];
         if (0 == ctor->GetParameters().size())
         {
             return ctor;
@@ -176,9 +160,9 @@ ConstructorInfo* Type::GetConstructor() const
 
 ConstructorInfo* Type::GetConstructor(std::initializer_list<Type*> args) const
 {
-    for (int i = 0; i < Constructors.size(); i++)
+    for (int i = 0; i < m_constructors.size(); i++)
     {
-        auto ctor = Constructors[i];
+        auto ctor = m_constructors[i];
         if (args.size() == ctor->GetParameters().size())
         {
             bool paramMatch = true;
@@ -200,9 +184,9 @@ ConstructorInfo* Type::GetConstructor(std::initializer_list<Type*> args) const
 
 ConstructorInfo* Type::GetConstructor(std::initializer_list<ParameterInfo> args) const
 {
-    for (int i = 0; i < Constructors.size(); i++)
+    for (int i = 0; i < m_constructors.size(); i++)
     {
-        auto ctor = Constructors[i];
+        auto ctor = m_constructors[i];
         if (args.size() == ctor->GetParameters().size())
         {
             bool paramMatch = true;
@@ -229,7 +213,7 @@ std::vector<MethodInfo*> Type::GetMethods() const
     const Type* curType = this;
     while (curType != nullptr)
     {
-        methods.insert(methods.end(), curType->Methods.begin(), curType->Methods.end());
+        methods.insert(methods.end(), curType->m_methods.begin(), curType->m_methods.end());
         curType = curType->GetBaseType();
     }
     return methods;
@@ -240,9 +224,9 @@ MethodInfo* Type::GetMethod(const std::string& name) const
     auto curType = this;
     while (curType != nullptr)
     {
-        for (int i = 0; i < curType->Methods.size(); i++)
+        for (int i = 0; i < curType->m_methods.size(); i++)
         {
-            auto m = curType->Methods[i];
+            auto m = curType->m_methods[i];
             if (m->GetName() == name)
             {
                 return m;
@@ -258,9 +242,9 @@ MethodInfo* Type::GetMethod(const std::string& name, std::initializer_list<Type*
     auto curType = this;
     while (curType != nullptr)
     {
-        for (int i = 0; i < curType->Methods.size(); i++)
+        for (int i = 0; i < curType->m_methods.size(); i++)
         {
-            auto m = curType->Methods[i];
+            auto m = curType->m_methods[i];
             if (m->GetName() == name && args.size() == m->GetParameters().size())
             {
                 bool paramMatch = true;
@@ -288,9 +272,9 @@ MethodInfo* Type::GetMethod(const std::string& name, std::initializer_list<Param
     auto curType = this;
     while (curType != nullptr)
     {
-        for (int i = 0; i < curType->Methods.size(); i++)
+        for (int i = 0; i < curType->m_methods.size(); i++)
         {
-            auto m = curType->Methods[i];
+            auto m = curType->m_methods[i];
             if (m->GetName() == name && args.size() == m->GetParameters().size())
             {
                 bool paramMatch = true;
@@ -320,7 +304,7 @@ std::vector<PropertyInfo*> Type::GetProperties() const
     const Type* curType = this;
     while (curType != nullptr)
     {
-        rets.insert(rets.end(), curType->Properties.begin(), curType->Properties.end());
+        rets.insert(rets.end(), curType->m_properties.begin(), curType->m_properties.end());
         curType = curType->GetBaseType();
     }
     return rets;
@@ -331,10 +315,10 @@ PropertyInfo* Type::GetProperty(const std::string& name) const
     auto curType = this;
     while (curType != nullptr)
     {
-        for (int i = 0; i < curType->Properties.size(); i++)
+        for (int i = 0; i < curType->m_properties.size(); i++)
         {
-            if (curType->Properties[i]->GetName() == name)
-                return curType->Properties[i];
+            if (curType->m_properties[i]->GetName() == name)
+                return curType->m_properties[i];
         }
         curType = curType->GetBaseType();
     }

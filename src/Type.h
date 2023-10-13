@@ -12,18 +12,13 @@ class Type : public Attributable
 private:
     friend struct TypeRegister;
 
-    friend Type* NewType(size_t size, bool is_trivially_copyable, Type* base);
+    friend Type* NewType(size_t size, uint32_t flags, Type* base);
 
-    Type(size_t size, bool is_trivially_copyable, Type* baseType);
-
-    // Attribute* GetAttributeImpl(const std::type_info& type) const override;
+    Type(size_t size, uint32_t flags, Type* baseType);
 
     ~Type() {}
 
 public:
-    // using Attributable::GetAttribute;
-    // using Attributable::HasAttribute;
-
     // 类型名称
     const std::string& GetName() const;
 
@@ -55,7 +50,7 @@ public:
 
     bool IsTrivially() const
     {
-        return is_trivially_copyable;
+        return (m_flags & TYPE_FLAG_TRIVIALLY_COPY) != 0;
     }
 
     bool IsEnum() const;
@@ -117,20 +112,23 @@ public:
     // 根据名称查找类型
     static Type* Find(const std::string& name);
 
-    //// 注册新类型
-    // static Type* Register(const std::string& name);
+    // 注册新类型
+    template <typename T>
+    static Type* Register()
+    {
+        TypeRegister::Register<typename TypeWarper<T>::objtype>();
+    }
 
 protected:
     std::string m_name;
     size_t m_size;
-    bool is_trivially_copyable;
+    uint32_t m_flags;
     Type* m_baseType;
-    Type* UnderlyingType = nullptr;
-    std::vector<Attribute*> Attributes;
-    std::vector<ConstructorInfo*> Constructors;
-    std::vector<MethodInfo*> Methods;
-    std::vector<PropertyInfo*> Properties;
-    std::vector<EnumInfo> EnumValues;
+    Type* m_underlyingType = nullptr;
+    std::vector<ConstructorInfo*> m_constructors;
+    std::vector<MethodInfo*> m_methods;
+    std::vector<PropertyInfo*> m_properties;
+    std::vector<EnumInfo> m_enumValues;
     Type* next;
 };
 

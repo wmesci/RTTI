@@ -1,6 +1,5 @@
 #pragma once
 #include "System.h"
-#include <typeinfo>
 
 namespace rtti
 {
@@ -52,11 +51,13 @@ struct TypeWarper<T, false>
     static Type* ClassType() { return Boxed<type>::ClassType(); }
 };
 
-// template<typename T>
-// Type* typeof() { return TypeWarper<remove_cr<T>>::ClassType(); }
+template <typename T>
+Type* type_of()
+{
+    return TypeWarper<remove_cr<T>>::ClassType();
+}
 
-#define typeof(...) TypeWarper<remove_cr<__VA_ARGS__>>::ClassType()
-// typeof<__VA_ARGS__>()
+#define typeof(...) type_of<__VA_ARGS__>()
 
 struct ParameterInfo
 {
@@ -74,38 +75,40 @@ ParameterInfo GetParameterInfo()
         .IsConst = std::is_const_v<std::remove_reference_t<T>>};
 }
 
-extern Type* NewType(size_t size, bool is_trivially_copyable, Type* base);
+constexpr uint32_t TYPE_FLAG_TRIVIALLY_COPY = 1;
+
+extern Type* NewType(size_t size, uint32_t flags, Type* base);
 
 template <typename CLS>
 Type* CreateType()
 {
-    static Type* type = NewType(sizeof(CLS), std::is_trivially_copyable_v<CLS>, nullptr);
+    static Type* type = NewType(sizeof(CLS), std::is_trivially_copyable_v<CLS> ? TYPE_FLAG_TRIVIALLY_COPY : 0, nullptr);
     return type;
 }
 
 template <typename CLS, typename BASE>
 Type* CreateType()
 {
-    static Type* type = NewType(sizeof(CLS), std::is_trivially_copyable_v<CLS>, typeof(BASE));
+    static Type* type = NewType(sizeof(CLS), std::is_trivially_copyable_v<CLS> ? TYPE_FLAG_TRIVIALLY_COPY : 0, typeof(BASE));
     return type;
 }
 
 // template <typename CLS, typename WARPCLS, typename BASE>
 // Type* CreateType()
 //{
-//     static Type* type = NewType(sizeof(CLS), std::is_trivially_copyable_v<CLS>, typeof(BASE));
+//     static Type* type = NewType(sizeof(CLS), std::is_trivially_copyable_v<CLS> ? TYPE_FLAG_TRIVIALLY_COPY : 0, typeof(BASE));
 //     return type;
 // }
 
-#define TYPE_DECLARE(cls, base)            \
-public:                                    \
-    static Type* ClassType()               \
-    {                                      \
-        return CreateType<cls, base>();    \
-    }                                      \
-    virtual Type* GetType() const override \
-    {                                      \
-        return ClassType();                \
+#define TYPE_DECLARE(cls, base, ...)               \
+public:                                            \
+    static Type* ClassType()                       \
+    {                                              \
+        return CreateType<cls, base>(__VA_ARGS__); \
+    }                                              \
+    virtual Type* GetType() const override         \
+    {                                              \
+        return ClassType();                        \
     }
 
 struct TypeRegister
@@ -114,64 +117,71 @@ struct TypeRegister
     static void Register();
 };
 
-#define TYPE_DEFINE_BEGIN(cls)                                    \
-    template <>                                                   \
-    void rtti::TypeRegister::Register<cls>()                      \
-    {                                                             \
-        using HOST = cls;                                         \
-        [[maybe_unused]] auto type = typeof(HOST);                \
-        type->m_name = #cls##s;                                   \
-        [[maybe_unused]] auto& Attributes = type->Attributes;     \
-        [[maybe_unused]] auto& Constructors = type->Constructors; \
-        [[maybe_unused]] auto& Methods = type->Methods;           \
-        [[maybe_unused]] auto& Properties = type->Properties;
+#define TYPE_DEFINE_BEGIN(cls)                                      \
+    template <>                                                     \
+    void rtti::TypeRegister::Register<cls>()                        \
+    {                                                               \
+        using HOST = cls;                                           \
+        [[maybe_unused]] auto type = typeof(HOST);                  \
+        type->m_name = #cls##s;                                     \
+        type->m_attributes = {};                                    \
+        [[maybe_unused]] auto& Constructors = type->m_constructors; \
+        [[maybe_unused]] auto& Methods = type->m_methods;           \
+        [[maybe_unused]] auto& Properties = type->m_properties;
 
-#define TYPE_DEFINE_END()                                                                             \
-    if constexpr (std::is_default_constructible<HOST>::value)                                         \
-    {                                                                                                 \
-        Constructors.push_back(ConstructorInfo::Register<HOST>(&constructor<HOST>, {}));              \
-    }                                                                                                 \
-    if constexpr (std::is_copy_constructible<HOST>::value)                                            \
-    {                                                                                                 \
-        Constructors.push_back(ConstructorInfo::Register<HOST>(&constructor<HOST, const HOST&>, {})); \
-    }                                                                                                 \
+#define TYPE_DEFINE_END()                                                                         \
+    if constexpr (std::is_default_constructible<HOST>::value)                                     \
+    {                                                                                             \
+        Constructors.push_back(ConstructorInfo::Register<HOST>(&constructor<HOST>));              \
+    }                                                                                             \
+    if constexpr (std::is_copy_constructible<HOST>::value)                                        \
+    {                                                                                             \
+        Constructors.push_back(ConstructorInfo::Register<HOST>(&constructor<HOST, const HOST&>)); \
+    }                                                                                             \
     }
 
-#define TYPE_BOXED_BEGIN(cls)                                     \
-    template <>                                                   \
-    void rtti::TypeRegister::Register<rtti::Boxed<cls>>()         \
-    {                                                             \
-        using HOST = cls;                                         \
-        [[maybe_unused]] auto type = typeof(HOST);                \
-        type->m_name = #cls##s;                                   \
-        [[maybe_unused]] auto& Attributes = type->Attributes;     \
-        [[maybe_unused]] auto& Constructors = type->Constructors; \
-        [[maybe_unused]] auto& Methods = type->Methods;           \
-        [[maybe_unused]] auto& Properties = type->Properties;
+#define TYPE_BOXED_BEGIN(cls)                                       \
+    template <>                                                     \
+    void rtti::TypeRegister::Register<rtti::Boxed<cls>>()           \
+    {                                                               \
+        using HOST = cls;                                           \
+        [[maybe_unused]] auto type = typeof(HOST);                  \
+        type->m_name = #cls##s;                                     \
+        type->m_attributes = {};                                    \
+        [[maybe_unused]] auto& Constructors = type->m_constructors; \
+        [[maybe_unused]] auto& Methods = type->m_methods;           \
+        [[maybe_unused]] auto& Properties = type->m_properties;
 
-#define TYPE_BOXED_END()                                                                              \
-    if constexpr (std::is_default_constructible<HOST>::value)                                         \
-    {                                                                                                 \
-        Constructors.push_back(ConstructorInfo::Register<HOST>(&constructor<HOST>, {}));              \
-    }                                                                                                 \
-    if constexpr (std::is_copy_constructible<HOST>::value)                                            \
-    {                                                                                                 \
-        Constructors.push_back(ConstructorInfo::Register<HOST>(&constructor<HOST, const HOST&>, {})); \
-    }                                                                                                 \
+#define TYPE_BOXED_END()                                                                          \
+    if constexpr (std::is_default_constructible<HOST>::value)                                     \
+    {                                                                                             \
+        Constructors.push_back(ConstructorInfo::Register<HOST>(&constructor<HOST>));              \
+    }                                                                                             \
+    if constexpr (std::is_copy_constructible<HOST>::value)                                        \
+    {                                                                                             \
+        Constructors.push_back(ConstructorInfo::Register<HOST>(&constructor<HOST, const HOST&>)); \
+    }                                                                                             \
     }
 
-#define ADD_ENUM_VALUE(v) type->EnumValues.push_back({.number = (int64_t)(HOST::v), .value = Box(HOST::v), .name = #v##s});
+#define ADD_ENUM_VALUE(v) type->m_enumValues.push_back({.number = (int64_t)(HOST::v), .value = Box(HOST::v), .name = #v##s});
 
-#define TYPE_DEFINE_ENUM(cls, ...)                                \
-    template <>                                                   \
-    void rtti::TypeRegister::Register<rtti::Boxed<cls>>()         \
-    {                                                             \
-        static_assert(std::is_enum_v<cls>);                       \
-        using HOST = cls;                                         \
-        using underlying_type = std::underlying_type<HOST>::type; \
-        auto type = typeof(HOST);                                 \
-        type->m_name = #cls##s;                                   \
-        type->UnderlyingType = typeof(underlying_type);           \
-        MACRO_FOR_EACH(ADD_ENUM_VALUE, __VA_ARGS__)               \
+#define TYPE_DEFINE_ENUM(cls, ...)                                                                        \
+    template <>                                                                                           \
+    void rtti::TypeRegister::Register<rtti::Boxed<cls>>()                                                 \
+    {                                                                                                     \
+        static_assert(std::is_enum_v<cls>);                                                               \
+        using HOST = cls;                                                                                 \
+        using underlying_type = std::underlying_type<HOST>::type;                                         \
+        auto type = typeof(HOST);                                                                         \
+        type->m_name = #cls##s;                                                                           \
+        type->m_underlyingType = typeof(underlying_type);                                                 \
+        type->m_constructors.push_back(ConstructorInfo::Register<HOST>(&constructor<HOST>));              \
+        type->m_constructors.push_back(ConstructorInfo::Register<HOST>(&constructor<HOST, const HOST&>)); \
+        type->m_constructors.push_back(ConstructorInfo::Register<HOST>(&constructor<HOST, cls>));         \
+        type->m_constructors.push_back(ConstructorInfo::Register<HOST>(&constructor<HOST, int32_t>));     \
+        type->m_constructors.push_back(ConstructorInfo::Register<HOST>(&constructor<HOST, uint32_t>));    \
+        type->m_constructors.push_back(ConstructorInfo::Register<HOST>(&constructor<HOST, int64_t>));     \
+        type->m_constructors.push_back(ConstructorInfo::Register<HOST>(&constructor<HOST, uint64_t>));    \
+        MACRO_FOR_EACH(ADD_ENUM_VALUE, __VA_ARGS__)                                                       \
     }
 } // namespace rtti

@@ -193,14 +193,19 @@ void print(MethodBase* m)
     printf(")");
 }
 
+void RegisterTypes()
+{
+    InitCoreType();
+
+    Type::Register<TestEnum>();
+    Type::Register<TestStruct>();
+    Type::Register<TestBase>();
+    Type::Register<Test>();
+}
+
 int main([[maybe_unused]] int argc, [[maybe_unused]] char* argv[])
 {
-    CoreRuntime::Init([]()
-                      {
-        INIT_TYPE(TestEnum);
-        INIT_TYPE(TestStruct);
-        INIT_TYPE(TestBase);
-        INIT_TYPE(Test); });
+    RegisterTypes();
 
     auto type = Type::Find("Test"s);
     auto obj = type->Create<Test>();

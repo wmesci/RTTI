@@ -1,50 +1,36 @@
 ﻿#pragma once
 #include "System.h"
-#include <vector>
+#include <any>
+#include <map>
 
 namespace rtti
 {
-struct Attribute
-{
-    const bool Inheritable;
-
-    Attribute()
-        : Inheritable(true)
-    {
-    }
-
-    Attribute(bool inheritable)
-        : Inheritable(inheritable)
-    {
-    }
-
-    virtual ~Attribute() {}
-};
-
-template <typename T, typename... Args>
-inline Attribute* ATTR(Args&&... args)
-{
-    return new T(args...);
-}
-
 class Attributable
 {
 protected:
-    Attributable() = default;
+    std::map<std::string, std::any> m_attributes;
 
-    // virtual Attribute* GetAttributeImpl(const std::type_info& type) const = 0;
+protected:
+    Attributable(const std::map<std::string, std::any>& attributes)
+        : m_attributes(attributes)
+    {
+    }
 
 public:
-    // template<typename T>
-    // bool HasAttribute() const
-    //{
-    //	return GetAttribute<T>() != nullptr;
-    // }
+    bool HasAttribute(const std::string& name) const
+    {
+        return m_attributes.find(name) != m_attributes.end();
+    }
 
-    // template<typename T>
-    // T* GetAttribute() const
-    //{
-    //	return static_cast<T*>(GetAttributeImpl(typeid(T)));
-    // }
+    std::any GetAttribute(const std::string& name) const
+    {
+        auto it = m_attributes.find(name);
+        if (it != m_attributes.end())
+        {
+            return it->second;
+        }
+
+        return std::any();
+    }
 };
 } // namespace rtti

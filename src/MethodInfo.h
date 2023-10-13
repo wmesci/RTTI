@@ -84,28 +84,16 @@ private:
     Type* owner;
     Type* rettype;
     std::vector<ParameterInfo> arguments;
-    const std::vector<Attribute*> attributes;
 
 protected:
-    MethodBase(Type* owner, const std::string& name, Type* rettype, std::initializer_list<ParameterInfo> arguments, std::initializer_list<Attribute*> attributes)
-        : Attributable()
+    MethodBase(Type* owner, const std::string& name, Type* rettype, std::initializer_list<ParameterInfo> arguments)
+        : Attributable({})
         , name(name)
         , owner(owner)
         , rettype(rettype)
         , arguments(arguments)
-        , attributes(attributes)
     {
     }
-
-    // Attribute* GetAttributeImpl(const std::type_info& type) const override
-    //{
-    //     for (const auto& attr : attributes)
-    //     {
-    //         if (typeid(*attr) == type)
-    //             return attr;
-    //     }
-    //     return nullptr;
-    // }
 
 public:
     const std::string& GetName() const { return name; }
@@ -123,8 +111,8 @@ private:
     std::function<ObjectPtr(const std::vector<ObjectPtr>&)> func;
 
 protected:
-    ConstructorInfo(Type* owner, std::initializer_list<ParameterInfo> arguments, std::function<ObjectPtr(const std::vector<ObjectPtr>&)> func, std::initializer_list<Attribute*> attributes)
-        : MethodBase(owner, ".ctor"s, owner, arguments, attributes)
+    ConstructorInfo(Type* owner, std::initializer_list<ParameterInfo> arguments, std::function<ObjectPtr(const std::vector<ObjectPtr>&)> func)
+        : MethodBase(owner, ".ctor"s, owner, arguments)
         , func(func)
     {
     }
@@ -142,7 +130,7 @@ public:
     }
 
     template <typename Host, typename... Args>
-    static ConstructorInfo* Register(ObjectPtr (*f)(Args...), std::initializer_list<Attribute*> attributes)
+    static ConstructorInfo* Register(ObjectPtr (*f)(Args...))
     {
         std::function<ObjectPtr(const std::vector<ObjectPtr>&)> func = [=](const std::vector<ObjectPtr>& args) -> ObjectPtr
         {
@@ -157,7 +145,7 @@ public:
                               { return f(std::forward<Args>(args)...); },
                               args_tuple);
         };
-        return new ConstructorInfo(typeof(Host), {GetParameterInfo<Args>()...}, func, attributes);
+        return new ConstructorInfo(typeof(Host), {GetParameterInfo<Args>()...}, func);
     }
 };
 
@@ -167,14 +155,14 @@ private:
     std::function<ObjectPtr(Object*, const std::vector<ObjectPtr>&)> func;
 
 protected:
-    MethodInfo(Type* owner, const std::string& name, Type* rettype, std::initializer_list<ParameterInfo> arguments, std::function<ObjectPtr(Object*, const std::vector<ObjectPtr>&)> func, std::initializer_list<Attribute*> attributes)
-        : MethodBase(owner, name, rettype, arguments, attributes)
+    MethodInfo(Type* owner, const std::string& name, Type* rettype, std::initializer_list<ParameterInfo> arguments, std::function<ObjectPtr(Object*, const std::vector<ObjectPtr>&)> func)
+        : MethodBase(owner, name, rettype, arguments)
         , func(func)
     {
     }
 
     template <typename Host, typename FUNC, typename RET, typename... Args>
-    static MethodInfo* RegisterImpl(const std::string& name, FUNC f, std::initializer_list<Attribute*> attributes)
+    static MethodInfo* RegisterImpl(const std::string& name, FUNC f)
     {
         static_assert(std::is_member_function_pointer_v<FUNC>);
 
@@ -218,7 +206,7 @@ protected:
             rettype = typeof(RET);
         }
 
-        return new MethodInfo(typeof(Host), name, rettype, {GetParameterInfo<Args>()...}, func, attributes);
+        return new MethodInfo(typeof(Host), name, rettype, {GetParameterInfo<Args>()...}, func);
     }
 
 public:
@@ -245,19 +233,19 @@ public:
     }
 
     template <typename Host, typename RET, typename... Args>
-    static MethodInfo* Register(const std::string& name, RET (Host::*FUNC)(Args...), std::initializer_list<Attribute*> attributes)
+    static MethodInfo* Register(const std::string& name, RET (Host::*FUNC)(Args...))
     {
-        return RegisterImpl<Host, decltype(FUNC), RET, Args...>(name, FUNC, attributes);
+        return RegisterImpl<Host, decltype(FUNC), RET, Args...>(name, FUNC);
     }
 
     template <typename Host, typename RET, typename... Args>
-    static MethodInfo* Register(const std::string& name, RET (Host::*FUNC)(Args...) const, std::initializer_list<Attribute*> attributes)
+    static MethodInfo* Register(const std::string& name, RET (Host::*FUNC)(Args...) const)
     {
-        return RegisterImpl<Host, decltype(FUNC), RET, Args...>(name, FUNC, attributes);
+        return RegisterImpl<Host, decltype(FUNC), RET, Args...>(name, FUNC);
     }
 };
 
-#define METHOD(name, ...) MethodInfo::Register(#name##s, &HOST::name, {__VA_ARGS__})
+#define METHOD(name) MethodInfo::Register(#name##s, &HOST::name)
 
 template <class T, class... Args>
 ObjectPtr constructor(Args... args)
@@ -268,5 +256,5 @@ ObjectPtr constructor(Args... args)
         return Box(T(std::forward<Args>(args)...));
 }
 
-#define CONSTRUCTOR(...) ConstructorInfo::Register<HOST, __VA_ARGS__>(&constructor<HOST, __VA_ARGS__>, {})
+#define CONSTRUCTOR(...) ConstructorInfo::Register<HOST, __VA_ARGS__>(&constructor<HOST, __VA_ARGS__>)
 } // namespace rtti

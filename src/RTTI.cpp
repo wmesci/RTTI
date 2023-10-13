@@ -43,3 +43,23 @@ TYPE_BOXED_END()
 
 TYPE_BOXED_BEGIN(std::string)
 TYPE_BOXED_END()
+
+void InitCoreType()
+{
+    Type::Register<Object>();
+    Type::Register<ObjectBox>();
+
+    Type::Register<std::byte>();
+    Type::Register<int8_t>();
+    Type::Register<uint8_t>();
+    Type::Register<int16_t>();
+    Type::Register<uint16_t>();
+    Type::Register<int32_t>();
+    Type::Register<uint32_t>();
+    Type::Register<int64_t>();
+    Type::Register<uint64_t>();
+    Type::Register<float>();
+    Type::Register<double>();
+
+    Type::Register<std::string>();
+}

@@ -3,7 +3,7 @@
 
 using namespace rtti;
 
-Type* rtti::NewType(size_t size, bool is_trivially_copyable, Type* base)
+Type* rtti::NewType(size_t size, uint32_t flags, Type* base)
 {
-    return new Type(size, is_trivially_copyable, base);
+    return new Type(size, flags, base);
 }
