@@ -1,5 +1,6 @@
+#include <cassert>
 #include "RTTI.h"
-#include "TypeReg.h"
+#include "TypeRegister.h"
 
 using namespace rtti;
 
@@ -134,57 +135,6 @@ public:
     }
 };
 
-TYPE_DEFINE_ENUM(TestEnum, Value1, Value2)
-
-TYPE_BOXED_BEGIN(TestStruct)
-Properties =
-    {
-        FIELD(TE)};
-TYPE_BOXED_END()
-
-TYPE_DEFINE_BEGIN(TestBase)
-    Methods =
-        {
-            METHOD(BaseFunc1),
-            METHOD(BaseFunc2),
-            METHOD(BaseFunc3),
-            METHOD(BaseFunc4),
-            METHOD(BaseFunc5),
-            METHOD(BaseFunc6),
-            METHOD(BaseFunc7),
-    };
-    Properties =
-        {
-            FIELD(TestBaseA),
-    };
-TYPE_DEFINE_END()
-
-TYPE_DEFINE_BEGIN(Test)
-    Constructors =
-        {
-            CONSTRUCTOR(int),
-            CONSTRUCTOR(int, float),
-    },
-    Methods =
-        {
-            METHOD(Func1),
-            METHOD(Func2),
-            METHOD(Func3),
-            METHOD(Func4),
-            METHOD(Func5),
-            METHOD(Func6),
-            METHOD(Func7),
-    };
-    Properties =
-        {
-            FIELD(A),
-            FIELD(B),
-            FIELD(C),
-            FIELD(D),
-            FIELD_READONLY(E),
-    };
-TYPE_DEFINE_END()
-
 void print(MethodBase* m)
 {
     if (m->ReturnType() == nullptr)
@@ -218,12 +168,22 @@ void RegisterTypes()
 {
     InitCoreType();
 
-    Type::Register<TestEnum>();
-    Type::Register<TestStruct>();
-    Type::Register<TestBase>();
-    // Type::Register<Test>();
+    TypeRegister<TestEnum>::New("TestEnum"s).value("Value1", TestEnum::Value1).value("Value2", TestEnum::Value2);
 
-    TypeReg<Test>::New("Test"s)
+    TypeRegister<TestStruct>::New("TestStruct"s)
+        .property("TE"s, &TestStruct::TE);
+
+    TypeRegister<TestBase>::New("TestBase"s)
+        .property("TestBaseA"s, &TestBase::TestBaseA)
+        .method("BaseFunc1"s, &TestBase::BaseFunc1)
+        .method("BaseFunc2"s, &TestBase::BaseFunc2)
+        .method("BaseFunc3"s, &TestBase::BaseFunc3)
+        .method("BaseFunc4"s, &TestBase::BaseFunc4)
+        .method("BaseFunc5"s, &TestBase::BaseFunc5)
+        .method("BaseFunc6"s, &TestBase::BaseFunc6)
+        .method("BaseFunc7"s, &TestBase::BaseFunc7);
+
+    TypeRegister<Test>::New("Test"s)
         .constructor<int>()
         .constructor<int, float>()
         .property("A"s, &Test::A, {{"clonable"s, true}, {"min_value", 100}, {"max_value", 100}})
@@ -243,11 +203,28 @@ void RegisterTypes()
         .method("Func7"s, &Test::Func7);
 }
 
+template <typename T>
+struct Handle
+{
+};
+
+namespace rtti
+{
+template <typename T>
+struct TypeWarper<Handle<T>, false>
+{
+    using type = remove_cr<T>;
+    using objtype = typename TypeWarper<type>::objtype;
+    static Type* ClassType() { return TypeWarper<type>::ClassType(); }
+};
+} // namespace rtti
+
 int main([[maybe_unused]] int argc, [[maybe_unused]] char* argv[])
 {
-    __debugbreak();
-
     RegisterTypes();
+
+    assert(typeof(Test) == typeof(std::shared_ptr<Test>));
+    assert(type_of<Test>() == type_of<Handle<Test>>());
 
     auto type = Type::Find("Test"s);
     auto obj = type->Create<Test>();

@@ -10,10 +10,8 @@ namespace rtti
 class Type : public Attributable
 {
 private:
+    template <typename T, bool, bool>
     friend struct TypeRegister;
-
-    template <typename T>
-    friend struct TypeReg;
 
     friend Type* NewType(const std::string& name, size_t size, uint32_t flags, Type* base);
 
@@ -114,13 +112,6 @@ public:
 
     // 根据名称查找类型
     static Type* Find(const std::string& name);
-
-    // 注册新类型
-    template <typename T>
-    static Type* Register()
-    {
-        TypeRegister::Register<typename TypeWarper<T>::objtype>();
-    }
 
 protected:
     std::string m_name;

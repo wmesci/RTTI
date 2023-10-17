@@ -2,65 +2,26 @@
 #include "Type.h"
 #include "MethodInfo.h"
 #include "Reflection.h"
-#include "TypeReg.h"
+#include "TypeRegister.h"
 
 using namespace rtti;
 
-TYPE_DEFINE_BEGIN(ObjectBox)
-TYPE_DEFINE_END()
-
-TYPE_BOXED_BEGIN(std::byte)
-TYPE_BOXED_END()
-
-TYPE_BOXED_BEGIN(int8_t)
-TYPE_BOXED_END()
-
-TYPE_BOXED_BEGIN(uint8_t)
-TYPE_BOXED_END()
-
-TYPE_BOXED_BEGIN(int16_t)
-TYPE_BOXED_END()
-
-TYPE_BOXED_BEGIN(uint16_t)
-TYPE_BOXED_END()
-
-TYPE_BOXED_BEGIN(int32_t)
-TYPE_BOXED_END()
-
-TYPE_BOXED_BEGIN(uint32_t)
-TYPE_BOXED_END()
-
-TYPE_BOXED_BEGIN(int64_t)
-TYPE_BOXED_END()
-
-TYPE_BOXED_BEGIN(uint64_t)
-TYPE_BOXED_END()
-
-TYPE_BOXED_BEGIN(float)
-TYPE_BOXED_END()
-
-TYPE_BOXED_BEGIN(double)
-TYPE_BOXED_END()
-
-TYPE_BOXED_BEGIN(std::string)
-TYPE_BOXED_END()
-
 void InitCoreType()
 {
-    Type::Register<Object>();
-    Type::Register<ObjectBox>();
+    TypeRegister<Object>::New("Object");
+    TypeRegister<ObjectBox>::New("ObjectBox");
 
-    Type::Register<std::byte>();
-    Type::Register<int8_t>();
-    Type::Register<uint8_t>();
-    Type::Register<int16_t>();
-    Type::Register<uint16_t>();
-    Type::Register<int32_t>();
-    Type::Register<uint32_t>();
-    Type::Register<int64_t>();
-    Type::Register<uint64_t>();
-    Type::Register<float>();
-    Type::Register<double>();
+    TypeRegister<std::byte>::New("byte");
+    TypeRegister<int8_t>::New("int8_t");
+    TypeRegister<uint8_t>::New("uint8_t");
+    TypeRegister<int16_t>::New("int16_t");
+    TypeRegister<uint16_t>::New("uint16_t");
+    TypeRegister<int32_t>::New("int32_t");
+    TypeRegister<uint32_t>::New("uint32_t");
+    TypeRegister<int64_t>::New("int64_t");
+    TypeRegister<uint64_t>::New("uint64_t");
+    TypeRegister<float>::New("float");
+    TypeRegister<double>::New("double");
 
-    Type::Register<std::string>();
+    TypeRegister<std::string>::New("string");
 }
