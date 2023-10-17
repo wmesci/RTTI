@@ -77,26 +77,26 @@ ParameterInfo GetParameterInfo()
 
 constexpr uint32_t TYPE_FLAG_TRIVIALLY_COPY = 1;
 
-extern Type* NewType(size_t size, uint32_t flags, Type* base);
+extern Type* NewType(const std::string& name, size_t size, uint32_t flags, Type* base);
 
 template <typename CLS>
 Type* CreateType()
 {
-    static Type* type = NewType(sizeof(CLS), std::is_trivially_copyable_v<CLS> ? TYPE_FLAG_TRIVIALLY_COPY : 0, nullptr);
+    static Type* type = NewType(""s, sizeof(CLS), std::is_trivially_copyable_v<CLS> ? TYPE_FLAG_TRIVIALLY_COPY : 0, nullptr);
     return type;
 }
 
 template <typename CLS, typename BASE>
 Type* CreateType()
 {
-    static Type* type = NewType(sizeof(CLS), std::is_trivially_copyable_v<CLS> ? TYPE_FLAG_TRIVIALLY_COPY : 0, typeof(BASE));
+    static Type* type = NewType(""s, sizeof(CLS), std::is_trivially_copyable_v<CLS> ? TYPE_FLAG_TRIVIALLY_COPY : 0, typeof(BASE));
     return type;
 }
 
 // template <typename CLS, typename WARPCLS, typename BASE>
 // Type* CreateType()
 //{
-//     static Type* type = NewType(sizeof(CLS), std::is_trivially_copyable_v<CLS> ? TYPE_FLAG_TRIVIALLY_COPY : 0, typeof(BASE));
+//     static Type* type = NewType(""s, sizeof(CLS), std::is_trivially_copyable_v<CLS> ? TYPE_FLAG_TRIVIALLY_COPY : 0, typeof(BASE));
 //     return type;
 // }
 

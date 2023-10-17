@@ -86,8 +86,8 @@ private:
     std::vector<ParameterInfo> arguments;
 
 protected:
-    MethodBase(Type* owner, const std::string& name, Type* rettype, std::initializer_list<ParameterInfo> arguments)
-        : Attributable({})
+    MethodBase(Type* owner, const std::string& name, Type* rettype, std::initializer_list<ParameterInfo> arguments, const std::map<std::string, std::any>& attributes)
+        : Attributable(attributes)
         , name(name)
         , owner(owner)
         , rettype(rettype)
@@ -111,8 +111,8 @@ private:
     std::function<ObjectPtr(const std::vector<ObjectPtr>&)> func;
 
 protected:
-    ConstructorInfo(Type* owner, std::initializer_list<ParameterInfo> arguments, std::function<ObjectPtr(const std::vector<ObjectPtr>&)> func)
-        : MethodBase(owner, ".ctor"s, owner, arguments)
+    ConstructorInfo(Type* owner, std::initializer_list<ParameterInfo> arguments, std::function<ObjectPtr(const std::vector<ObjectPtr>&)> func, const std::map<std::string, std::any>& attributes)
+        : MethodBase(owner, ".ctor"s, owner, arguments, attributes)
         , func(func)
     {
     }
@@ -130,7 +130,7 @@ public:
     }
 
     template <typename Host, typename... Args>
-    static ConstructorInfo* Register(ObjectPtr (*f)(Args...))
+    static ConstructorInfo* Register(ObjectPtr (*f)(Args...), const std::map<std::string, std::any>& attributes = {})
     {
         std::function<ObjectPtr(const std::vector<ObjectPtr>&)> func = [=](const std::vector<ObjectPtr>& args) -> ObjectPtr
         {
@@ -145,7 +145,7 @@ public:
                               { return f(std::forward<Args>(args)...); },
                               args_tuple);
         };
-        return new ConstructorInfo(typeof(Host), {GetParameterInfo<Args>()...}, func);
+        return new ConstructorInfo(typeof(Host), {GetParameterInfo<Args>()...}, func, attributes);
     }
 };
 
@@ -155,14 +155,14 @@ private:
     std::function<ObjectPtr(Object*, const std::vector<ObjectPtr>&)> func;
 
 protected:
-    MethodInfo(Type* owner, const std::string& name, Type* rettype, std::initializer_list<ParameterInfo> arguments, std::function<ObjectPtr(Object*, const std::vector<ObjectPtr>&)> func)
-        : MethodBase(owner, name, rettype, arguments)
+    MethodInfo(Type* owner, const std::string& name, Type* rettype, std::initializer_list<ParameterInfo> arguments, std::function<ObjectPtr(Object*, const std::vector<ObjectPtr>&)> func, const std::map<std::string, std::any>& attributes)
+        : MethodBase(owner, name, rettype, arguments, attributes)
         , func(func)
     {
     }
 
     template <typename Host, typename FUNC, typename RET, typename... Args>
-    static MethodInfo* RegisterImpl(const std::string& name, FUNC f)
+    static MethodInfo* RegisterImpl(const std::string& name, FUNC f, const std::map<std::string, std::any>& attributes = {})
     {
         static_assert(std::is_member_function_pointer_v<FUNC>);
 
@@ -206,7 +206,7 @@ protected:
             rettype = typeof(RET);
         }
 
-        return new MethodInfo(typeof(Host), name, rettype, {GetParameterInfo<Args>()...}, func);
+        return new MethodInfo(typeof(Host), name, rettype, {GetParameterInfo<Args>()...}, func, attributes);
     }
 
 public:
@@ -233,19 +233,19 @@ public:
     }
 
     template <typename Host, typename RET, typename... Args>
-    static MethodInfo* Register(const std::string& name, RET (Host::*FUNC)(Args...))
+    static MethodInfo* Register(const std::string& name, RET (Host::*FUNC)(Args...), const std::map<std::string, std::any>& attributes = {})
     {
         return RegisterImpl<Host, decltype(FUNC), RET, Args...>(name, FUNC);
     }
 
     template <typename Host, typename RET, typename... Args>
-    static MethodInfo* Register(const std::string& name, RET (Host::*FUNC)(Args...) const)
+    static MethodInfo* Register(const std::string& name, RET (Host::*FUNC)(Args...) const, const std::map<std::string, std::any>& attributes = {})
     {
         return RegisterImpl<Host, decltype(FUNC), RET, Args...>(name, FUNC);
     }
 };
 
-#define METHOD(name) MethodInfo::Register(#name##s, &HOST::name)
+#define METHOD(name) MethodInfo::Register(#name##s, &HOST::name, {})
 
 template <class T, class... Args>
 ObjectPtr constructor(Args... args)

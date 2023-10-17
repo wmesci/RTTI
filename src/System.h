@@ -1,44 +1,11 @@
 ﻿#pragma once
-#if defined(_DEBUG) && !defined(DEBUG)
-#define DEBUG
-#endif
-
-#if !defined(DEBUG) && !defined(NDEBUG)
-#define NDEBUG
-#endif
-
 #if defined(__clang__)
-#define __FUNC__ __PRETTY_FUNCTION__
-#define FORCEDINLINE __attribute__((always_inline))
-#pragma clang diagnostic ignored "-Wuser-defined-literals"
-#pragma clang diagnostic ignored "-Wswitch"
-#pragma clang diagnostic ignored "-Wformat-security"
-#elif defined(_MSC_VER)
-#ifndef _CRT_SECURE_NO_WARNINGS
-#define _CRT_SECURE_NO_WARNINGS
-#endif
-#ifndef _CRT_NON_CONFORMING_SWPRINTFS
-#define _CRT_NON_CONFORMING_SWPRINTFS
-#endif
-// #pragma execution_character_set("utf-8")
-#define __FUNC__ __FUNCSIG__
-#define FORCEDINLINE __forceinline
-#pragma warning(disable : 4250) // 菱形继承
-#pragma warning(disable : 4455) // 已保留不以下划线开头的文本后缀标识符
-#pragma warning(disable : 4307) // “ + ”: 整型常量溢出
-// #pragma intrinsic(memset, memcmp, memcpy, strlen, strcmp, strcpy, _strset, strcat, abs)
+#define __debugbreak __builtin_debugtrap
 #endif
 
 #include <type_traits>
 #include <cassert>
-#include <cstring>
-#include <utility>
-#include <stdexcept>
-#include <cstdint>
-#include <functional>
-#include <memory>
 #include <string>
-#include <format>
 
 using namespace std::string_literals;
 

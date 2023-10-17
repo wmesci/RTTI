@@ -1,4 +1,5 @@
 #include "RTTI.h"
+#include "TypeReg.h"
 
 using namespace rtti;
 
@@ -72,7 +73,27 @@ public:
     std::string B;
     ObjectPtr C;
     TestEnum D = TestEnum::Value1;
-    TestStruct E;
+    const TestStruct E;
+
+    int GetProp1()
+    {
+        printf("void Func1()\n");
+    }
+
+    void SetProp1(int v)
+    {
+        printf("void Func2() const\n");
+    }
+
+    int GetProp2()
+    {
+        printf("void Func1()\n");
+    }
+
+    int GetProp3() const
+    {
+        printf("void Func1()\n");
+    }
 
     void Func1()
     {
@@ -160,7 +181,7 @@ TYPE_DEFINE_BEGIN(Test)
             FIELD(B),
             FIELD(C),
             FIELD(D),
-            FIELD(E),
+            FIELD_READONLY(E),
     };
 TYPE_DEFINE_END()
 
@@ -200,11 +221,32 @@ void RegisterTypes()
     Type::Register<TestEnum>();
     Type::Register<TestStruct>();
     Type::Register<TestBase>();
-    Type::Register<Test>();
+    // Type::Register<Test>();
+
+    TypeReg<Test>::New("Test"s)
+        .constructor<int>()
+        .constructor<int, float>()
+        .property("A"s, &Test::A, {{"clonable"s, true}, {"min_value", 100}, {"max_value", 100}})
+        .property("B"s, &Test::B)
+        .property("C"s, &Test::C)
+        .property("D"s, &Test::D)
+        .property("E"s, &Test::E)
+        .property("Prop1"s, &Test::GetProp1, &Test::SetProp1)
+        .property("Prop2"s, &Test::GetProp2)
+        .property("Prop3"s, &Test::GetProp3)
+        .method("Func1"s, &Test::Func1)
+        .method("Func2"s, &Test::Func2)
+        .method("Func3"s, &Test::Func3)
+        .method("Func4"s, &Test::Func4)
+        .method("Func5"s, &Test::Func5)
+        .method("Func6"s, &Test::Func6)
+        .method("Func7"s, &Test::Func7);
 }
 
 int main([[maybe_unused]] int argc, [[maybe_unused]] char* argv[])
 {
+    __debugbreak();
+
     RegisterTypes();
 
     auto type = Type::Find("Test"s);
@@ -244,6 +286,10 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char* argv[])
     for (auto p : type->GetProperties())
     {
         printf("    ");
+        if (p->CanWrite())
+            printf("RW ");
+        else
+            printf("R  ");
         if (p->PropertyType()->IsBoxedType())
             printf("%s %s", p->PropertyType()->GetName().c_str(), p->GetName().c_str());
         else

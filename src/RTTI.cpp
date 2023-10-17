@@ -2,6 +2,7 @@
 #include "Type.h"
 #include "MethodInfo.h"
 #include "Reflection.h"
+#include "TypeReg.h"
 
 using namespace rtti;
 

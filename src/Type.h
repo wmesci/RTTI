@@ -12,9 +12,12 @@ class Type : public Attributable
 private:
     friend struct TypeRegister;
 
-    friend Type* NewType(size_t size, uint32_t flags, Type* base);
+    template <typename T>
+    friend struct TypeReg;
 
-    Type(size_t size, uint32_t flags, Type* baseType);
+    friend Type* NewType(const std::string& name, size_t size, uint32_t flags, Type* base);
+
+    Type(const std::string& name, size_t size, uint32_t flags, Type* baseType, const std::map<std::string, std::any>& attributes);
 
     ~Type() {}
 

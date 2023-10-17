@@ -6,9 +6,9 @@ using namespace rtti;
 
 Type* header = nullptr;
 
-Type::Type(size_t size, uint32_t flags, Type* baseType)
-    : Attributable({})
-    , m_name("Object"s)
+Type::Type(const std::string& name, size_t size, uint32_t flags, Type* baseType, const std::map<std::string, std::any>& attributes)
+    : Attributable(attributes)
+    , m_name(name)
     , m_size(size)
     , m_flags(flags)
     , m_baseType(baseType)
