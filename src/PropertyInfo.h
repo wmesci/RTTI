@@ -144,15 +144,4 @@ public:
         return Register<Host, T>(name, warpgetter, warpsetter);
     }
 };
-
-#define PROPERTY(name) PropertyInfo::Register(#name##s, &HOST::Get##name, &HOST::Set##name)
-#define PROPERTY_READONLY(name) PropertyInfo::Register(#name##s, &HOST::Get##name)
-#define FIELD(name) PropertyInfo::Register<HOST, decltype(HOST::name)>( \
-    #name##s,                                                           \
-    [](const ObjectPtr& obj) { return Box(getSelf<HOST>(obj)->name); }, \
-    [](const ObjectPtr& obj, const ObjectPtr& value) { getSelf<HOST>(obj)->name = Unbox<remove_cr<decltype(HOST::name)>>(value); })
-#define FIELD_READONLY(name) PropertyInfo::Register<HOST, decltype(HOST::name)>( \
-    #name##s,                                                                    \
-    [](const ObjectPtr& obj) { return Box(getSelf<HOST>(obj)->name); },          \
-    nullptr)
 } // namespace rtti

@@ -244,17 +244,4 @@ public:
         return RegisterImpl<Host, decltype(FUNC), RET, Args...>(name, FUNC);
     }
 };
-
-#define METHOD(name) MethodInfo::Register(#name##s, &HOST::name, {})
-
-template <class T, class... Args>
-ObjectPtr constructor(Args... args)
-{
-    if constexpr (is_object<T>)
-        return std::make_shared<T>(std::forward<Args>(args)...);
-    else
-        return Box(T(std::forward<Args>(args)...));
-}
-
-#define CONSTRUCTOR(...) ConstructorInfo::Register<HOST, __VA_ARGS__>(&constructor<HOST, __VA_ARGS__>)
 } // namespace rtti
