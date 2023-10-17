@@ -22,13 +22,9 @@ IF(WIN32)
     ADD_DEFINITIONS(-DUNICODE)
     ADD_DEFINITIONS(-D_UNICODE)
 
-ELSEIF(APPLE)
-
-    SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -stdlib=libc++ -I/usr/include -I/usr/local/include")
-
 ELSE()
 
-    MESSAGE(FATAL_ERROR "Only support Windows & Mac system")
+    SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -stdlib=libc++ -I/usr/include -I/usr/local/include")
 
 ENDIF()
 
