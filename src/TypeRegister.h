@@ -26,10 +26,11 @@ private:
 
 public:
     // 注册新类型
-    static TypeRegister<T> New(const std::string& name)
+    static TypeRegister<T> New(const std::string& name, const std::map<std::string, std::any>& attributes = {})
     {
         Type* type = type_of<T>();
         type->m_name = name;
+        type->m_attributes = attributes;
 
         TypeRegister<T> reg;
 
@@ -128,11 +129,12 @@ private:
 
 public:
     // 注册新类型
-    static TypeRegister<T> New(const std::string& name)
+    static TypeRegister<T> New(const std::string& name, const std::map<std::string, std::any>& attributes = {})
     {
         Type* type = type_of<T>();
         type->m_name = name;
         type->m_underlyingType = type_of<typename std::underlying_type<T>::type>();
+        type->m_attributes = attributes;
 
         TypeRegister<T> reg;
 
@@ -163,10 +165,11 @@ private:
 
 public:
     // 注册新类型
-    static TypeRegister<T> New(const std::string& name)
+    static TypeRegister<T> New(const std::string& name, const std::map<std::string, std::any>& attributes = {})
     {
         Type* type = type_of<T>();
         type->m_name = name;
+        type->m_attributes = attributes;
 
         TypeRegister<T> reg;
 

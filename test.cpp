@@ -167,7 +167,7 @@ void RegisterTypes()
 {
     InitCoreType();
 
-    TypeRegister<TestEnum>::New("TestEnum"s).value("Value1", TestEnum::Value1).value("Value2", TestEnum::Value2);
+    TypeRegister<TestEnum>::New("TestEnum"s, {{"displayName"s, "TestEnumForDisplay"s}}).value("Value1", TestEnum::Value1).value("Value2", TestEnum::Value2);
 
     TypeRegister<TestStruct>::New("TestStruct"s)
         .property("TE"s, &TestStruct::TE);
@@ -225,7 +225,13 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char* argv[])
     assert(type_of<Test>() == type_of<std::shared_ptr<Test>>());
     assert(type_of<Test>() == type_of<Handle<Test>>());
 
+    assert(std::any_cast<std::string>(type_of<TestEnum>()->GetAttribute("displayName")) == "TestEnumForDisplay"s);
+
     auto type = Type::Find("Test"s);
+
+    assert(type->GetProperty("A")->HasAttribute("clonable"));
+    assert(!type->GetProperty("B")->HasAttribute("clonable"));
+
     auto obj = type->Create<Test>();
     auto obj1 = type->Create<Test>(123);
     auto obj2 = type->Create<Test>(123, 789.12f);
