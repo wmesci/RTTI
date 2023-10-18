@@ -84,7 +84,7 @@ inline std::enable_if_t<!is_object<typename TypeWarper<remove_cr<T>>::type>, T> 
         if (objbox->IsPointer())
         {
             // Unbox<int*>(int*)
-            assert(ptr->GetType() == typeof(T));
+            assert(ptr->GetType() == type_of<T>());
             auto boxed = static_cast<Boxed<T>*>(objbox);
             assert(boxed != nullptr);
             return boxed->Unbox();
@@ -94,7 +94,7 @@ inline std::enable_if_t<!is_object<typename TypeWarper<remove_cr<T>>::type>, T> 
             if constexpr (!std::is_void_v<std::remove_pointer_t<T>>)
             {
                 // Unbox<int*>(int)
-                assert(ptr->GetType() == typeof(std::remove_pointer_t<T>));
+                assert(ptr->GetType() == type_of<std::remove_pointer_t<T>>());
                 auto boxed = static_cast<Boxed<std::remove_pointer_t<T>>*>(objbox);
                 return &boxed->Unbox();
             }
@@ -107,15 +107,15 @@ inline std::enable_if_t<!is_object<typename TypeWarper<remove_cr<T>>::type>, T> 
     }
     else if constexpr (std::is_reference_v<T>)
     {
-        assert(ptr->GetType() == typeof(T));
+        assert(ptr->GetType() == type_of<T>());
         auto boxed = static_cast<Boxed<remove_cr<T>>*>(objbox);
         return boxed->Unbox();
     }
     else
     {
-        if (typeof(T) != ptr->GetType())
+        if (type_of<T>() != ptr->GetType())
         {
-            return Unbox<T>(objbox->Convert(typeof(T)));
+            return Unbox<T>(objbox->Convert(type_of<T>()));
         }
 
         auto boxed = static_cast<Boxed<T>*>(objbox);

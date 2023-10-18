@@ -3,22 +3,6 @@
 
 namespace rtti
 {
-namespace
-{
-template <typename T, typename... Args>
-static std::enable_if_t<std::is_constructible<T, Args...>::value, std::shared_ptr<T> (*)(Args&&...)> default_constructor()
-{
-    return [](Args&&... args) -> std::shared_ptr<T>
-    { return std::make_shared<T>(std::forward<Args>(args)...); };
-}
-
-template <typename T, typename... Args>
-static std::enable_if_t<!std::is_constructible<T, Args...>::value, std::shared_ptr<T> (*)(Args&&...)> default_constructor()
-{
-    return nullptr;
-}
-} // namespace
-
 template <typename T, bool isobject = is_object<T>>
 struct TypeWarper
 {
@@ -52,12 +36,17 @@ struct TypeWarper<T, false>
 };
 
 template <typename T>
-Type* type_of()
+inline Type* type_of()
 {
     return TypeWarper<remove_cr<T>>::ClassType();
 }
 
-#define typeof(...) type_of<__VA_ARGS__>()
+struct EnumInfo
+{
+    int64_t number;
+    ObjectPtr value;
+    std::string name;
+};
 
 struct ParameterInfo
 {
@@ -65,15 +54,6 @@ struct ParameterInfo
     bool IsRef;
     bool IsConst;
 };
-
-template <typename T>
-ParameterInfo GetParameterInfo()
-{
-    return ParameterInfo{
-        .Type = typeof(T),
-        .IsRef = std::is_reference_v<T>,
-        .IsConst = std::is_const_v<std::remove_reference_t<T>>};
-}
 
 constexpr uint32_t TYPE_FLAG_TRIVIALLY_COPY = 1;
 
@@ -89,25 +69,18 @@ Type* CreateType()
 template <typename CLS, typename BASE>
 Type* CreateType()
 {
-    static Type* type = NewType(""s, sizeof(CLS), std::is_trivially_copyable_v<CLS> ? TYPE_FLAG_TRIVIALLY_COPY : 0, typeof(BASE));
+    static Type* type = NewType(""s, sizeof(CLS), std::is_trivially_copyable_v<CLS> ? TYPE_FLAG_TRIVIALLY_COPY : 0, type_of<BASE>());
     return type;
 }
 
-// template <typename CLS, typename WARPCLS, typename BASE>
-// Type* CreateType()
-//{
-//     static Type* type = NewType(""s, sizeof(CLS), std::is_trivially_copyable_v<CLS> ? TYPE_FLAG_TRIVIALLY_COPY : 0, typeof(BASE));
-//     return type;
-// }
-
-#define TYPE_DECLARE(cls, base, ...)               \
-public:                                            \
-    static Type* ClassType()                       \
-    {                                              \
-        return CreateType<cls, base>(__VA_ARGS__); \
-    }                                              \
-    virtual Type* GetType() const override         \
-    {                                              \
-        return ClassType();                        \
+#define TYPE_DECLARE(cls, base)            \
+public:                                    \
+    static Type* ClassType()               \
+    {                                      \
+        return CreateType<cls, base>();    \
+    }                                      \
+    virtual Type* GetType() const override \
+    {                                      \
+        return ClassType();                \
     }
 } // namespace rtti

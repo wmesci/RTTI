@@ -67,7 +67,7 @@ public:
     template <typename Host, typename T>
     static PropertyInfo* Register(const std::string& name, const PropertyGetter& getter, const PropertySetter& setter, const std::map<std::string, std::any>& attributes = {})
     {
-        return new PropertyInfo(typeof(Host), name, typeof(T), getter, setter, attributes);
+        return new PropertyInfo(type_of<Host>(), name, type_of<T>(), getter, setter, attributes);
     }
 
     // 注册实例只读属性

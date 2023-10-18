@@ -12,7 +12,7 @@ FILE(GLOB_RECURSE RTTI_SOURCE src/*.cpp)
 SET(TARGET_SOURCE ${RTTI_SOURCE})
 
 IF (CMAKE_CXX_COMPILER_ID MATCHES "Clang")
-    SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fno-rtti -fno-exceptions -ffunction-sections -fdata-sections -O3 -flto -fvisibility=hidden")
+    SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fno-rtti -fno-exceptions -ffunction-sections -fdata-sections -flto -fvisibility=hidden")
 ELSEIF (CMAKE_CXX_COMPILER_ID MATCHES "MSVC")
     SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /utf-8 /bigobj /arch:AVX /Zc:preprocessor /Ot /Oi /Qpar /GS /sdl /fp:fast /wd4819 /wd4267 /wd4244 /wd4800 /wd4305 /wd4309")
 ENDIF()

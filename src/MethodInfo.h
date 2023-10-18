@@ -4,9 +4,9 @@
 #include "ObjectBox.h"
 #include "Attributable.h"
 
-namespace rtti
+namespace
 {
-template <typename T, bool isobj = std::is_convertible_v<remove_cr<T>, ObjectPtr>>
+template <typename T, bool isobj = std::is_convertible_v<rtti::remove_cr<T>, rtti::ObjectPtr>>
 struct wrap_reference
 {
     using type = T;
@@ -15,7 +15,7 @@ struct wrap_reference
 template <typename T>
 struct wrap_reference<T, true>
 {
-    using type = remove_cr<T>;
+    using type = rtti::remove_cr<T>;
 };
 
 template <typename T>
@@ -40,20 +40,20 @@ template <typename T>
 using wrap_reference_t = typename wrap_reference<T>::type;
 
 template <typename T>
-static T UnboxArg(const ObjectPtr& p)
+static T UnboxArg(const rtti::ObjectPtr& p)
 {
     using unref_t = std::unwrap_reference_t<T>;
 
-    if constexpr (std::is_convertible_v<unref_t, Object>)
+    if constexpr (std::is_convertible_v<unref_t, rtti::Object>)
     {
-        return Unbox<remove_cr<unref_t>>(p);
+        return rtti::Unbox<rtti::remove_cr<unref_t>>(p);
     }
     else if constexpr (std::is_reference_v<unref_t>)
     {
         if constexpr (std::is_same_v<std::reference_wrapper<const std::remove_reference_t<unref_t>>, T>)
-            return (const unref_t&)Unbox<remove_cr<unref_t>&>(p);
+            return (const unref_t&)Unbox<rtti::remove_cr<unref_t>&>(p);
         else
-            return (unref_t&)Unbox<remove_cr<unref_t>&>(p);
+            return (unref_t&)Unbox<rtti::remove_cr<unref_t>&>(p);
     }
     else
     {
@@ -67,16 +67,28 @@ static Tuple MakeArgsImpl(Iterator p, std::index_sequence<I...>)
     return Tuple(UnboxArg<std::tuple_element_t<I, Tuple>>(p[I])...);
 }
 
-// 将 Iterator 里的 Object* 逐个转换为 Args 对应的类型，并放在 tuple 里
+// 将 Iterator 里的 ObjectPtr 逐个转换为 Args 对应的类型，并放在 tuple 里
 template <typename Iterator, typename... Args>
 static auto MakeArgs(Iterator p)
 {
-    static_assert(std::is_same_v<remove_cr<decltype(p[0])>, ObjectPtr>, "Iterator type must be ObjectPtr");
+    static_assert(std::is_same_v<rtti::remove_cr<decltype(p[0])>, rtti::ObjectPtr>, "Iterator type must be ObjectPtr");
 
     using Tuple = std::tuple<wrap_reference_t<Args>...>;
     return MakeArgsImpl<Tuple>(p, std::make_index_sequence<sizeof...(Args)>{});
 }
 
+template <typename T>
+static rtti::ParameterInfo GetParameterInfo()
+{
+    return rtti::ParameterInfo{
+        .Type = rtti::type_of<T>(),
+        .IsRef = std::is_reference_v<T>,
+        .IsConst = std::is_const_v<std::remove_reference_t<T>>};
+}
+} // namespace
+
+namespace rtti
+{
 class MethodBase : public Attributable
 {
 private:
@@ -145,7 +157,7 @@ public:
                               { return f(std::forward<Args>(args)...); },
                               args_tuple);
         };
-        return new ConstructorInfo(typeof(Host), {GetParameterInfo<Args>()...}, func, attributes);
+        return new ConstructorInfo(type_of<Host>(), {GetParameterInfo<Args>()...}, func, attributes);
     }
 };
 
@@ -162,7 +174,7 @@ protected:
     }
 
     template <typename Host, typename FUNC, typename RET, typename... Args>
-    static MethodInfo* RegisterImpl(const std::string& name, FUNC f, const std::map<std::string, std::any>& attributes = {})
+    static MethodInfo* RegisterImpl(const std::string& name, FUNC f, const std::map<std::string, std::any>& attributes)
     {
         static_assert(std::is_member_function_pointer_v<FUNC>);
 
@@ -203,10 +215,10 @@ protected:
         }
         else
         {
-            rettype = typeof(RET);
+            rettype = type_of<RET>();
         }
 
-        return new MethodInfo(typeof(Host), name, rettype, {GetParameterInfo<Args>()...}, func, attributes);
+        return new MethodInfo(type_of<Host>(), name, rettype, {GetParameterInfo<Args>()...}, func, attributes);
     }
 
 public:
@@ -235,13 +247,13 @@ public:
     template <typename Host, typename RET, typename... Args>
     static MethodInfo* Register(const std::string& name, RET (Host::*FUNC)(Args...), const std::map<std::string, std::any>& attributes = {})
     {
-        return RegisterImpl<Host, decltype(FUNC), RET, Args...>(name, FUNC);
+        return RegisterImpl<Host, decltype(FUNC), RET, Args...>(name, FUNC, attributes);
     }
 
     template <typename Host, typename RET, typename... Args>
     static MethodInfo* Register(const std::string& name, RET (Host::*FUNC)(Args...) const, const std::map<std::string, std::any>& attributes = {})
     {
-        return RegisterImpl<Host, decltype(FUNC), RET, Args...>(name, FUNC);
+        return RegisterImpl<Host, decltype(FUNC), RET, Args...>(name, FUNC, attributes);
     }
 };
 } // namespace rtti

@@ -132,7 +132,7 @@ public:
     {
         Type* type = type_of<T>();
         type->m_name = name;
-        type->m_underlyingType = typeof(typename std::underlying_type<T>::type);
+        type->m_underlyingType = type_of<typename std::underlying_type<T>::type>();
 
         TypeRegister<T> reg;
 

@@ -41,7 +41,7 @@ bool Type::CanCast(Type* type) const
 
 bool Type::IsBoxedType() const
 {
-    return GetBaseType() == typeof(ObjectBox);
+    return GetBaseType() == type_of<ObjectBox>();
 }
 
 bool Type::IsEnum() const

@@ -1,9 +1,8 @@
 ﻿#pragma once
+#include <vector>
 #include "Object.h"
 #include "ObjectBox.h"
 #include "Attributable.h"
-#include "EnumInfo.h"
-#include <vector>
 
 namespace rtti
 {
@@ -35,7 +34,7 @@ public:
     template <typename T>
     bool IsSubClassOf() const
     {
-        return IsSubClassOf(typeof(T));
+        return IsSubClassOf(type_of<T>());
     }
 
     // 当前类型是否能转换成指定类型
@@ -44,7 +43,7 @@ public:
     template <typename T>
     bool CanCast() const
     {
-        return CanCast(typeof(T));
+        return CanCast(type_of<T>());
     }
 
     bool IsBoxedType() const;
@@ -69,7 +68,7 @@ public:
     template <typename T>
     bool IsCompatible() const
     {
-        return IsCompatible(typeof(T));
+        return IsCompatible(type_of<T>());
     }
 
     bool IsCompatible(Object* obj) const;
@@ -131,7 +130,7 @@ ObjectPtr Boxed<T>::Convert(Type* targetType) const
 {
     if constexpr (std::is_enum_v<T>)
     {
-        if (targetType == typeof(std::int32_t))
+        if (targetType == type_of<std::int32_t>())
         {
             if constexpr (std::is_reference_v<T>)
                 return Box(static_cast<std::int32_t&>(object));

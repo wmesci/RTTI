@@ -1,6 +1,5 @@
 #include <cassert>
-#include "RTTI.h"
-#include "TypeRegister.h"
+#include "src/RTTI.h"
 
 using namespace rtti;
 
@@ -223,7 +222,7 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char* argv[])
 {
     RegisterTypes();
 
-    assert(typeof(Test) == typeof(std::shared_ptr<Test>));
+    assert(type_of<Test>() == type_of<std::shared_ptr<Test>>());
     assert(type_of<Test>() == type_of<Handle<Test>>());
 
     auto type = Type::Find("Test"s);
@@ -281,8 +280,8 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char* argv[])
     type->GetMethod("Func2"s)->Invoke(obj, {});
     printf("  ret = %d\n", Unbox<int>(type->GetMethod("Func3"s)->Invoke(obj, {})));
     printf("  ret = %s\n", type->GetMethod("Func4"s)->Invoke(obj, {})->GetType()->GetName().c_str());
-    type->GetMethod("Func5"s, {typeof(int)})->Invoke(obj, {Box(1234)});
-    type->GetMethod("Func7"s, {typeof(Object)})->Invoke(obj, {obj});
+    type->GetMethod("Func5"s, {type_of<int>()})->Invoke(obj, {Box(1234)});
+    type->GetMethod("Func7"s, {type_of<Object>()})->Invoke(obj, {obj});
 
     printf("\n");
 

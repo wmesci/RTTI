@@ -6,5 +6,6 @@
 #include "Type.h"
 #include "MethodInfo.h"
 #include "PropertyInfo.h"
+#include "TypeRegister.h"
 
 void InitCoreType();
