@@ -77,14 +77,14 @@ Type* CreateType()
     return type;
 }
 
-#define TYPE_DECLARE(cls, base)            \
-public:                                    \
-    static Type* ClassType()               \
-    {                                      \
-        return CreateType<cls, base>();    \
-    }                                      \
-    virtual Type* GetType() const override \
-    {                                      \
-        return ClassType();                \
+#define TYPE_DECLARE(cls, base)                  \
+public:                                          \
+    static rtti::Type* ClassType()               \
+    {                                            \
+        return rtti::CreateType<cls, base>();    \
+    }                                            \
+    virtual rtti::Type* GetType() const override \
+    {                                            \
+        return ClassType();                      \
     }
 } // namespace rtti

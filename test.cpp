@@ -227,6 +227,8 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char* argv[])
 
     assert(std::any_cast<std::string>(type_of<TestEnum>()->GetAttribute("displayName")) == "TestEnumForDisplay"s);
 
+    assert(Box(123)->GetType() == type_of<decltype(123)>());
+
     auto type = Type::Find("Test"s);
 
     assert(type->GetProperty("A")->HasAttribute("clonable"));

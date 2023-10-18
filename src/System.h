@@ -31,4 +31,7 @@ using remove_cr = std::remove_const_t<std::remove_reference_t<T>>;
 
 template <typename T>
 constexpr bool is_object = std::is_base_of<Object, T>::value || std::is_same<Object, T>::value;
+
+template <class T>
+T* cast(Object* obj);
 } // namespace rtti

@@ -4,6 +4,22 @@
 #include "ObjectBox.h"
 #include "Attributable.h"
 
+#if __cplusplus < 202002L
+namespace std
+{
+template <class T>
+struct unwrap_reference
+{
+    using type = T;
+};
+template <class U>
+struct unwrap_reference<std::reference_wrapper<U>>
+{
+    using type = U&;
+};
+} // namespace std
+#endif
+
 namespace
 {
 template <typename T, bool isobj = std::is_convertible_v<rtti::remove_cr<T>, rtti::ObjectPtr>>
@@ -42,7 +58,7 @@ using wrap_reference_t = typename wrap_reference<T>::type;
 template <typename T>
 static T UnboxArg(const rtti::ObjectPtr& p)
 {
-    using unref_t = std::unwrap_reference_t<T>;
+    using unref_t = typename std::unwrap_reference<T>::type;
 
     if constexpr (std::is_convertible_v<unref_t, rtti::Object>)
     {
@@ -51,13 +67,13 @@ static T UnboxArg(const rtti::ObjectPtr& p)
     else if constexpr (std::is_reference_v<unref_t>)
     {
         if constexpr (std::is_same_v<std::reference_wrapper<const std::remove_reference_t<unref_t>>, T>)
-            return (const unref_t&)Unbox<rtti::remove_cr<unref_t>&>(p);
+            return (const unref_t&)rtti::Unbox<rtti::remove_cr<unref_t>&>(p);
         else
-            return (unref_t&)Unbox<rtti::remove_cr<unref_t>&>(p);
+            return (unref_t&)rtti::Unbox<rtti::remove_cr<unref_t>&>(p);
     }
     else
     {
-        return Unbox<T>(p);
+        return rtti::Unbox<T>(p);
     }
 }
 
