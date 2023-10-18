@@ -6,11 +6,10 @@ using namespace rtti;
 
 Type* header = nullptr;
 
-Type::Type(const std::string& name, size_t size, uint32_t flags, Type* baseType, const std::map<std::string, std::any>& attributes)
+Type::Type(size_t size, Type* baseType, const std::map<std::string, std::any>& attributes)
     : Attributable(attributes)
-    , m_name(name)
+    , m_name()
     , m_size(size)
-    , m_flags(flags)
     , m_baseType(baseType)
     , next(header)
 {

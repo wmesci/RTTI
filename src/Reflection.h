@@ -11,6 +11,12 @@ struct TypeWarper
     static Type* ClassType() { return type::ClassType(); }
 };
 
+template <>
+struct TypeWarper<void, false>
+{
+    static Type* ClassType() { return nullptr; }
+};
+
 template <typename T>
 struct TypeWarper<std::shared_ptr<T>, false>
 {
@@ -55,21 +61,19 @@ struct ParameterInfo
     bool IsConst;
 };
 
-constexpr uint32_t TYPE_FLAG_TRIVIALLY_COPY = 1;
-
-extern Type* NewType(const std::string& name, size_t size, uint32_t flags, Type* base);
+extern Type* NewType(size_t size, Type* base);
 
 template <typename CLS>
 Type* CreateType()
 {
-    static Type* type = NewType(""s, sizeof(CLS), std::is_trivially_copyable_v<CLS> ? TYPE_FLAG_TRIVIALLY_COPY : 0, nullptr);
+    static Type* type = NewType(sizeof(CLS), nullptr);
     return type;
 }
 
 template <typename CLS, typename BASE>
 Type* CreateType()
 {
-    static Type* type = NewType(""s, sizeof(CLS), std::is_trivially_copyable_v<CLS> ? TYPE_FLAG_TRIVIALLY_COPY : 0, type_of<BASE>());
+    static Type* type = NewType(sizeof(CLS), type_of<BASE>());
     return type;
 }
 

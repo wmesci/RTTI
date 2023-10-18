@@ -12,9 +12,9 @@ private:
     template <typename T, bool, bool>
     friend struct TypeRegister;
 
-    friend Type* NewType(const std::string& name, size_t size, uint32_t flags, Type* base);
+    friend Type* NewType(size_t size, Type* base);
 
-    Type(const std::string& name, size_t size, uint32_t flags, Type* baseType, const std::map<std::string, std::any>& attributes);
+    Type(size_t size, Type* baseType, const std::map<std::string, std::any>& attributes);
 
     ~Type() {}
 
@@ -47,11 +47,6 @@ public:
     }
 
     bool IsBoxedType() const;
-
-    bool IsTrivially() const
-    {
-        return (m_flags & TYPE_FLAG_TRIVIALLY_COPY) != 0;
-    }
 
     bool IsEnum() const;
 
@@ -115,7 +110,6 @@ public:
 protected:
     std::string m_name;
     size_t m_size;
-    uint32_t m_flags;
     Type* m_baseType;
     Type* m_underlyingType = nullptr;
     std::vector<ConstructorInfo*> m_constructors;
