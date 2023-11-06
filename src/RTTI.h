@@ -8,4 +8,7 @@
 #include "PropertyInfo.h"
 #include "TypeRegister.h"
 
+namespace rtti
+{
 void InitCoreType();
+}

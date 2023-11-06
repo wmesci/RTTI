@@ -7,7 +7,31 @@
 #include <cassert>
 #include <string>
 
-using namespace std::string_literals;
+#define RTTI_LOG(x, msg) printf("[" #x "]: %s\n\t\t in %s[%s:%d]\n", (msg), __PRETTY_FUNCTION__, __FILE__, __LINE__)
+
+#if !defined(RTTI_DEBUG)
+#if defined(RTTI_ENABLE_LOG)
+#define RTTI_DEBUG(msg) RTTI_LOG(DEBUG, msg)
+#else
+#define RTTI_DEBUG(msg)
+#endif
+#endif
+
+#if !defined(RTTI_WARNING)
+#if defined(RTTI_ENABLE_LOG)
+#define RTTI_WARNING(msg) RTTI_LOG(WARNING, msg)
+#else
+#define RTTI_WARNING(msg)
+#endif
+#endif
+
+#if !defined(RTTI_ERROR)
+#if defined(RTTI_ENABLE_LOG)
+#define RTTI_ERROR(msg) RTTI_LOG(ERROR, msg)
+#else
+#define RTTI_ERROR(msg)
+#endif
+#endif
 
 namespace rtti
 {
@@ -26,12 +50,22 @@ class ConstructorInfo;
 class MethodInfo;
 class PropertyInfo;
 
+constexpr size_t Hash(const char* str, size_t seed = 0)
+{
+    return 0 == *str ? seed : Hash(str + 1, seed ^ (*str + 0x9e3779b9 + (seed << 6) + (seed >> 2)));
+}
+
+template <auto V>
+static constexpr auto force_consteval = V;
+
+#define HASH(str) force_consteval<Hash(str)>
+
 template <typename T>
 using remove_cr = std::remove_const_t<std::remove_reference_t<T>>;
 
 template <typename T>
 constexpr bool is_object = std::is_base_of<Object, T>::value || std::is_same<Object, T>::value;
 
-template <class T>
-T* cast(Object* obj);
+template <class To, class From>
+inline auto cast(const From& from);
 } // namespace rtti

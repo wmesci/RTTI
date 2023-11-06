@@ -27,7 +27,7 @@ private:
     const PropertyGetter getter;
     const PropertySetter setter;
 
-    PropertyInfo(Type* owner, const std::string& name, Type* type, const PropertyGetter& getter, const PropertySetter& setter, const std::map<std::string, std::any>& attributes)
+    PropertyInfo(Type* owner, const std::string& name, Type* type, const PropertyGetter& getter, const PropertySetter& setter, const std::map<size_t, std::any>& attributes)
         : Attributable(attributes)
         , owner(owner)
         , name(name)
@@ -56,7 +56,7 @@ public:
     template <typename T>
     T GetValue(const ObjectPtr& obj) const
     {
-        return Unbox<T>(GetValue(obj));
+        return cast<T>(GetValue(obj));
     }
 
     void SetValue(const ObjectPtr& obj, const ObjectPtr& value) const
@@ -65,81 +65,81 @@ public:
     }
 
     template <typename Host, typename T>
-    static PropertyInfo* Register(const std::string& name, const PropertyGetter& getter, const PropertySetter& setter, const std::map<std::string, std::any>& attributes = {})
+    static PropertyInfo* Register(const std::string& name, const PropertyGetter& getter, const PropertySetter& setter, const std::map<size_t, std::any>& attributes = {})
     {
         return new PropertyInfo(type_of<Host>(), name, type_of<T>(), getter, setter, attributes);
     }
 
     // 注册实例只读属性
     template <typename Host, typename T>
-    static PropertyInfo* Register(const std::string& name, T (Host::*getter)(), const std::map<std::string, std::any>& attributes = {})
+    static PropertyInfo* Register(const std::string& name, T (Host::*getter)(), const std::map<size_t, std::any>& attributes = {})
     {
         assert(getter != nullptr);
         return Register<Host, T>(
             name, [=](const ObjectPtr& obj)
-            { return Box((getSelf<Host>(obj)->*getter)()); },
+            { return cast<ObjectPtr>((getSelf<Host>(obj)->*getter)()); },
             nullptr);
     }
 
     // 注册实例只读属性
     template <typename Host, typename T>
-    static PropertyInfo* Register(const std::string& name, T (Host::*getter)() const, const std::map<std::string, std::any>& attributes = {})
+    static PropertyInfo* Register(const std::string& name, T (Host::*getter)() const, const std::map<size_t, std::any>& attributes = {})
     {
         assert(getter != nullptr);
         return Register<Host, T>(
             name, [=](const ObjectPtr& obj)
-            { return Box((getSelf<Host>(obj)->*getter)()); },
+            { return cast<ObjectPtr>((getSelf<Host>(obj)->*getter)()); },
             nullptr);
     }
 
     // 注册实例属性
     template <typename Host, typename T>
-    static PropertyInfo* Register(const std::string& name, T (Host::*getter)(), void (Host::*setter)(T), const std::map<std::string, std::any>& attributes = {})
+    static PropertyInfo* Register(const std::string& name, T (Host::*getter)(), void (Host::*setter)(T), const std::map<size_t, std::any>& attributes = {})
     {
         PropertyGetter warpgetter = (getter == nullptr ? PropertyGetter(nullptr) : (PropertyGetter)[=](const ObjectPtr& obj) {
-            return Box((getSelf<Host>(obj)->*getter)());
+            return cast<ObjectPtr>((getSelf<Host>(obj)->*getter)());
         });
         PropertySetter warpsetter = (setter == nullptr ? PropertySetter(nullptr) : (PropertySetter)[=](const ObjectPtr& obj, const ObjectPtr& value) {
-            (getSelf<Host>(obj)->*setter)(Unbox<T>(value));
+            (getSelf<Host>(obj)->*setter)(cast<T>(value));
         });
         return Register<Host, T>(name, warpgetter, warpsetter);
     }
 
     // 注册实例属性
     template <typename Host, typename T>
-    static PropertyInfo* Register(const std::string& name, T (Host::*getter)() const, void (Host::*setter)(T), const std::map<std::string, std::any>& attributes = {})
+    static PropertyInfo* Register(const std::string& name, T (Host::*getter)() const, void (Host::*setter)(T), const std::map<size_t, std::any>& attributes = {})
     {
         PropertyGetter warpgetter = (getter == nullptr ? PropertyGetter(nullptr) : (PropertyGetter)[=](const ObjectPtr& obj) {
-            return Box((getSelf<Host>(obj)->*getter)());
+            return cast<ObjectPtr>((getSelf<Host>(obj)->*getter)());
         });
         PropertySetter warpsetter = (setter == nullptr ? PropertySetter(nullptr) : (PropertySetter)[=](const ObjectPtr& obj, const ObjectPtr& value) {
-            (getSelf<Host>(obj)->*setter)(Unbox<T>(value));
+            (getSelf<Host>(obj)->*setter)(cast<T>(value));
         });
         return Register<Host, T>(name, warpgetter, warpsetter);
     }
 
     // 注册实例属性
     template <typename Host, typename T>
-    static PropertyInfo* Register(const std::string& name, T (Host::*getter)(), void (Host::*setter)(const T&), const std::map<std::string, std::any>& attributes = {})
+    static PropertyInfo* Register(const std::string& name, T (Host::*getter)(), void (Host::*setter)(const T&), const std::map<size_t, std::any>& attributes = {})
     {
         PropertyGetter warpgetter = (getter == nullptr ? PropertyGetter(nullptr) : (PropertyGetter)[=](const ObjectPtr& obj) {
-            return Box((getSelf<Host>(obj)->*getter)());
+            return cast<ObjectPtr>((getSelf<Host>(obj)->*getter)());
         });
         PropertySetter warpsetter = (setter == nullptr ? PropertySetter(nullptr) : (PropertySetter)[=](const ObjectPtr& obj, const ObjectPtr& value) {
-            (getSelf<Host>(obj)->*setter)(Unbox<T>(value));
+            (getSelf<Host>(obj)->*setter)(cast<T>(value));
         });
         return Register<Host, T>(name, warpgetter, warpsetter);
     }
 
     // 注册实例属性
     template <typename Host, typename T>
-    static PropertyInfo* Register(const std::string& name, T (Host::*getter)() const, void (Host::*setter)(const T&), const std::map<std::string, std::any>& attributes = {})
+    static PropertyInfo* Register(const std::string& name, T (Host::*getter)() const, void (Host::*setter)(const T&), const std::map<size_t, std::any>& attributes = {})
     {
         PropertyGetter warpgetter = (getter == nullptr ? PropertyGetter(nullptr) : (PropertyGetter)[=](const ObjectPtr& obj) {
-            return Box((getSelf<Host>(obj)->*getter)());
+            return cast<ObjectPtr>((getSelf<Host>(obj)->*getter)());
         });
         PropertySetter warpsetter = (setter == nullptr ? PropertySetter(nullptr) : (PropertySetter)[=](const ObjectPtr& obj, const ObjectPtr& value) {
-            (getSelf<Host>(obj)->*setter)(Unbox<T>(value));
+            (getSelf<Host>(obj)->*setter)(cast<T>(value));
         });
         return Register<Host, T>(name, warpgetter, warpsetter);
     }

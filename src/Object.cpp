@@ -13,7 +13,7 @@ Object::Object()
 {
 }
 
-Type* Object::GetType() const
+Type* Object::GetRttiType() const
 {
     return Object::ClassType();
 }

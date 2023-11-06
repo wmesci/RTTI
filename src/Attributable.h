@@ -8,23 +8,23 @@ namespace rtti
 class Attributable
 {
 protected:
-    std::map<std::string, std::any> m_attributes;
+    std::map<size_t, std::any> m_attributes;
 
 protected:
-    Attributable(const std::map<std::string, std::any>& attributes)
+    Attributable(const std::map<size_t, std::any>& attributes)
         : m_attributes(attributes)
     {
     }
 
 public:
-    bool HasAttribute(const std::string& name) const
+    bool HasAttribute(size_t id) const
     {
-        return m_attributes.find(name) != m_attributes.end();
+        return m_attributes.find(id) != m_attributes.end();
     }
 
-    std::any GetAttribute(const std::string& name) const
+    std::any GetAttribute(size_t id) const
     {
-        auto it = m_attributes.find(name);
+        auto it = m_attributes.find(id);
         if (it != m_attributes.end())
         {
             return it->second;

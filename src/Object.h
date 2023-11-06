@@ -13,7 +13,7 @@ private:
 public:
     Object();
 
-    virtual Type* GetType() const;
+    virtual Type* GetRttiType() const;
 
     virtual ~Object();
 

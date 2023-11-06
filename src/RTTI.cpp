@@ -4,14 +4,13 @@
 #include "Reflection.h"
 #include "TypeRegister.h"
 
-using namespace rtti;
-
+namespace rtti
+{
 void InitCoreType()
 {
     TypeRegister<Object>::New("Object");
     TypeRegister<ObjectBox>::New("ObjectBox");
 
-    TypeRegister<std::byte>::New("byte");
     TypeRegister<int8_t>::New("int8_t");
     TypeRegister<uint8_t>::New("uint8_t");
     TypeRegister<int16_t>::New("int16_t");
@@ -25,3 +24,4 @@ void InitCoreType()
 
     TypeRegister<std::string>::New("string");
 }
+} // namespace rtti

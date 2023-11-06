@@ -6,9 +6,9 @@ using namespace rtti;
 
 Type* header = nullptr;
 
-Type::Type(size_t size, Type* baseType, const std::map<std::string, std::any>& attributes)
+Type::Type(const std::string& name, size_t size, Type* baseType, const std::map<size_t, std::any>& attributes)
     : Attributable(attributes)
-    , m_name()
+    , m_name(name)
     , m_size(size)
     , m_baseType(baseType)
     , next(header)
@@ -33,11 +33,6 @@ bool Type::IsSubClassOf(Type* type) const
     return false;
 }
 
-bool Type::CanCast(Type* type) const
-{
-    return type == this || this->IsSubClassOf(type);
-}
-
 bool Type::IsBoxedType() const
 {
     return GetBaseType() == type_of<ObjectBox>();
@@ -45,7 +40,7 @@ bool Type::IsBoxedType() const
 
 bool Type::IsEnum() const
 {
-    return m_underlyingType != nullptr && m_enumValues.size() > 0;
+    return m_underlyingType != nullptr;
 }
 
 const std::vector<EnumInfo>& Type::GetEnumInfos() const
@@ -55,7 +50,6 @@ const std::vector<EnumInfo>& Type::GetEnumInfos() const
 
 bool Type::GetEnumInfo(const std::string& name, EnumInfo* pInfo) const
 {
-    assert(IsEnum());
     for (auto&& i : m_enumValues)
     {
         if (i.name == name)
@@ -69,7 +63,6 @@ bool Type::GetEnumInfo(const std::string& name, EnumInfo* pInfo) const
 
 bool Type::GetEnumInfo(const int64_t& number, EnumInfo* pInfo) const
 {
-    assert(IsEnum());
     for (auto&& i : m_enumValues)
     {
         if (i.number == number)
@@ -86,20 +79,97 @@ Type* Type::GetEnumUnderlyingType() const
     return m_underlyingType;
 }
 
-bool Type::IsCompatible(Type* type) const
+bool Type::IsAssignableTo(Type* type) const
 {
+    if (type == nullptr)
+        return false;
+
+    if (this == type)
+        return true;
+
     if (IsBoxedType())
-        return this == type;
+        return type == type_of<Object>();
     else
-        return this == type || type->IsSubClassOf(const_cast<Type*>(this));
+        return this->IsSubClassOf(type);
 }
 
-bool Type::IsCompatible(Object* obj) const
+bool Type::IsAssignableFrom(Type* type) const
+{
+    if (type == nullptr)
+        return false;
+
+    return type->IsAssignableTo(const_cast<Type*>(this));
+}
+
+bool Type::IsAssignableFrom(const ObjectPtr& obj) const
 {
     if (obj == nullptr)
         return !IsBoxedType();
 
-    return IsCompatible(obj->GetType());
+    return IsAssignableFrom(obj->GetRttiType());
+}
+
+bool Type::CanConvertTo(Type* targetType) const
+{
+    Type* sourceType = const_cast<Type*>(this);
+
+    if (targetType->IsAssignableFrom(sourceType))
+        return true;
+
+    for (auto&& i : targetType->m_constructors)
+    {
+        if (i->GetParameters().size() == 1 && i->GetParameters()[0].Type->IsAssignableFrom(sourceType))
+            return true;
+    }
+
+    for (auto&& i : m_typeConvertors)
+    {
+        if (i.TargetType->IsAssignableTo(targetType))
+            return true;
+    }
+
+    return false;
+}
+
+bool Type::Convert(const ObjectPtr& obj, Type* targetType, ObjectPtr& target)
+{
+    if (obj == nullptr)
+    {
+        if (!targetType->IsBoxedType())
+        {
+            target = nullptr;
+            return true;
+        }
+        return false;
+    }
+
+    Type* sourceType = obj->GetRttiType();
+
+    if (targetType->IsAssignableFrom(sourceType))
+    {
+        target = obj;
+        return true;
+    }
+
+    for (auto&& i : targetType->m_constructors)
+    {
+        if (i->GetParameters().size() == 1 && i->GetParameters()[0].Type->IsAssignableFrom(sourceType))
+        {
+            target = targetType->CreateInstance({obj});
+            if (target != nullptr)
+                return true;
+        }
+    }
+
+    for (auto&& i : sourceType->m_typeConvertors)
+    {
+        if (i.TargetType->IsAssignableTo(targetType))
+        {
+            return i.Convert(obj, i.TargetType, target);
+        }
+    }
+
+    return false;
 }
 
 ObjectPtr Type::CreateInstance(const std::vector<ObjectPtr>& args) const
@@ -115,7 +185,7 @@ ObjectPtr Type::CreateInstance(const std::vector<ObjectPtr>& args) const
                 auto pt = ctor->GetParameters()[j];
                 if (pt.Type->IsBoxedType())
                 {
-                    if (args[j] == nullptr || args[j]->GetType() != pt.Type)
+                    if (args[j] == nullptr || args[j]->GetRttiType() != pt.Type)
                     {
                         ok = false;
                         break;
@@ -123,7 +193,7 @@ ObjectPtr Type::CreateInstance(const std::vector<ObjectPtr>& args) const
                 }
                 else
                 {
-                    if (args[j] != nullptr && !args[j]->GetType()->CanCast(pt.Type))
+                    if (args[j] != nullptr && !args[j]->GetRttiType()->CanConvertTo(pt.Type))
                     {
                         ok = false;
                         break;
@@ -334,4 +404,14 @@ Type* Type::Find(const std::string& name)
         cur = cur->next;
     }
     return nullptr;
+}
+
+void Type::ForEach(const std::function<void(Type*)>& callback)
+{
+    Type* cur = header;
+    while (cur != nullptr)
+    {
+        callback(cur);
+        cur = cur->next;
+    }
 }

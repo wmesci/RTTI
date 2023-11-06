@@ -6,15 +6,28 @@
 
 namespace rtti
 {
+
+using Convertor = bool (*)(const ObjectPtr& obj, Type* targetType, ObjectPtr& target);
+
+struct TypeConvertor
+{
+    // Type* SourceType;
+    Type* TargetType;
+    Convertor Convert;
+};
+
 class Type : public Attributable
 {
 private:
     template <typename T, bool, bool>
     friend struct TypeRegister;
 
-    friend Type* NewType(size_t size, Type* base);
+    template <typename T>
+    friend Type* DefaultEnumRegister(Type* type);
 
-    Type(size_t size, Type* baseType, const std::map<std::string, std::any>& attributes);
+    friend Type* NewType(const std::string& name, size_t size, Type* base);
+
+    Type(const std::string& name, size_t size, Type* baseType, const std::map<size_t, std::any>& attributes);
 
     ~Type() {}
 
@@ -37,15 +50,6 @@ public:
         return IsSubClassOf(type_of<T>());
     }
 
-    // 当前类型是否能转换成指定类型
-    bool CanCast(Type* type) const;
-
-    template <typename T>
-    bool CanCast() const
-    {
-        return CanCast(type_of<T>());
-    }
-
     bool IsBoxedType() const;
 
     bool IsEnum() const;
@@ -58,15 +62,35 @@ public:
 
     Type* GetEnumUnderlyingType() const;
 
-    bool IsCompatible(Type* type) const;
+    bool IsAssignableFrom(Type* type) const;
 
     template <typename T>
-    bool IsCompatible() const
+    bool IsAssignableFrom() const
     {
-        return IsCompatible(type_of<T>());
+        return IsAssignableFrom(type_of<T>());
     }
 
-    bool IsCompatible(Object* obj) const;
+    bool IsAssignableFrom(const ObjectPtr& obj) const;
+
+    bool IsAssignableTo(Type* type) const;
+
+    template <typename T>
+    bool IsAssignableTo() const
+    {
+        return IsAssignableTo(type_of<T>());
+    }
+
+    // 当前类型能否转换为目标类型，只支持单次转换
+    bool CanConvertTo(Type* targetType) const;
+
+    template <typename T>
+    bool CanConvertTo() const
+    {
+        return CanConvertTo(type_of<T>());
+    }
+
+    // 将 obj 转换为目标类型，只支持单次转换
+    static bool Convert(const ObjectPtr& obj, Type* targetType, ObjectPtr& targets);
 
     // 创建当前类型的实例
     ObjectPtr CreateInstance(const std::vector<ObjectPtr>& args) const;
@@ -75,7 +99,7 @@ public:
     template <typename T = Object, typename... Args>
     std::shared_ptr<T> Create(Args&&... args) const
     {
-        return std::static_pointer_cast<T>(CreateInstance({Box(args)...}));
+        return std::static_pointer_cast<T>(CreateInstance({cast<ObjectPtr>(args)...}));
     }
 
     // 获取类型的构造函数
@@ -107,6 +131,8 @@ public:
     // 根据名称查找类型
     static Type* Find(const std::string& name);
 
+    static void ForEach(const std::function<void(Type*)>& callback);
+
 protected:
     std::string m_name;
     size_t m_size;
@@ -115,54 +141,110 @@ protected:
     std::vector<ConstructorInfo*> m_constructors;
     std::vector<MethodInfo*> m_methods;
     std::vector<PropertyInfo*> m_properties;
+    std::vector<TypeConvertor> m_typeConvertors;
     std::vector<EnumInfo> m_enumValues;
     Type* next;
 };
 
-template <typename T>
-ObjectPtr Boxed<T>::Convert(Type* targetType) const
+// 将当前类型转换成指定类型
+// 直接转换：
+//   Ptr<Subclass>  -->  Ptr<Base>
+//   Subclass*      -->  Base*
+//   int            -->  float
+// Unbox：
+//   ObjectPtr --> ValueType / ValueType*
+// Box：
+//   ValueType --> ObjectPtr
+template <class To, class From>
+inline auto cast(const From& from)
 {
-    if constexpr (std::is_enum_v<T>)
+    using TFrom = typename TypeWarper<remove_cr<From>>::type;
+    using TTo = typename TypeWarper<remove_cr<To>>::type;
+
+    static_assert(!std::is_pointer_v<TFrom> || !is_object<std::remove_pointer_t<TFrom>>);
+    static_assert(!std::is_pointer_v<TTo> || !is_object<std::remove_pointer_t<TTo>>);
+
+    if constexpr (is_object<TFrom>)
     {
-        if (targetType == type_of<std::int32_t>())
+        static_assert(std::is_same_v<std::shared_ptr<TFrom>, From> || std::is_same_v<std::weak_ptr<TFrom>, From>);
+        if constexpr (is_object<TTo>)
         {
-            if constexpr (std::is_reference_v<T>)
-                return Box(static_cast<std::int32_t&>(object));
-            else
-                return Box(static_cast<std::int32_t>(object));
-        }
-    }
-    else if constexpr (std::is_same_v<T, std::int32_t>)
-    {
-        if (targetType->IsEnum())
-        {
-            EnumInfo info;
-            if (targetType->GetEnumInfo(object, &info))
+            // (S/W)Ptr<A> --> (S/W)Ptr<B>
+            // From -> (S/W)Ptr<A>,     TFrom -> A
+            // To   -> (S/W)Ptr<B> / B, TTo   -> B
+
+            if constexpr (std::is_same_v<std::weak_ptr<TFrom>, From>)
             {
-                return info.value;
+                return cast<To>(from.lock());
+            }
+            else
+            {
+                if constexpr (std::is_convertible_v<From, remove_cr<To>>)
+                {
+                    return To(from);
+                }
+
+                if (from != nullptr)
+                {
+                    ObjectPtr target = nullptr;
+                    if (Type::Convert(from, type_of<TTo>(), target))
+                        return std::static_pointer_cast<TTo>(target);
+                }
+
+                if constexpr (std::is_same_v<std::shared_ptr<TTo>, To> || std::is_same_v<std::weak_ptr<TTo>, To>)
+                    return To(nullptr);
+                else
+                    return std::shared_ptr<TTo>(nullptr);
             }
         }
+        else
+        {
+            // ObjectPtr -> ValueType / ValueType* / SPtr<ValueType>
+            static_assert(std::is_same_v<From, ObjectPtr>);
+            static_assert(std::is_same_v<TTo, remove_cr<To>> || std::is_same_v<TTo, remove_cr<To>*>);
+
+            assert(from != nullptr);
+
+            if (from->GetRttiType() == type_of<TTo>() || from->GetRttiType() == type_of<std::remove_pointer_t<TTo>>())
+                return Unbox<TTo>(from);
+
+            ObjectPtr target = nullptr;
+            if (Type::Convert(from, type_of<TTo>(), target))
+                return Unbox<TTo>(target);
+
+            RTTI_ERROR((std::string("conversion of ") + from->GetRttiType()->GetName() + std::string(" to ") + type_of<TTo>()->GetName() + std::string(" is not allowed ")).c_str());
+            return TTo();
+        }
     }
-    return nullptr;
+    else
+    {
+        if constexpr (is_object<TTo>)
+        {
+            // ValueType -> ObjectPtr
+            // To -> ObjectPtr / Object, TTo -> Object
+
+            static_assert(std::is_same_v<TTo, Object>);
+
+            ObjectPtr target = nullptr;
+            if (Type::Convert(Box(from), type_of<TTo>(), target))
+                return std::static_pointer_cast<TTo>(target);
+
+            return std::shared_ptr<TTo>(nullptr);
+        }
+        else
+        {
+            // ValueType -> ValueType
+
+            if constexpr (std::is_convertible_v<From, remove_cr<To>>)
+                return TTo(from);
+
+            ObjectPtr target = nullptr;
+            if (Type::Convert(Box(from), type_of<TTo>(), target))
+                return Unbox<TTo>(target);
+
+            RTTI_ERROR((std::string("conversion of ") + type_of<TFrom>()->GetName() + std::string(" to ") + type_of<TTo>()->GetName() + std::string(" is not allowed ")).c_str());
+            return TTo();
+        }
+    }
 }
-
-// 将当前类型转换成指定类型
-template <class T>
-inline T* cast(Object* obj)
-{
-    if (obj != nullptr && obj->GetType()->CanCast<T>())
-        return static_cast<T*>(obj);
-
-    return nullptr;
-}
-
-template <class T>
-inline std::shared_ptr<T> cast(const ObjectPtr& obj)
-{
-    if (obj != nullptr && obj->GetType()->CanCast<T>())
-        return std::static_pointer_cast<T>(obj);
-
-    return nullptr;
-}
-
 } // namespace rtti
