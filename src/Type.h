@@ -156,13 +156,16 @@ protected:
 // Box：
 //   ValueType --> ObjectPtr
 template <class To, class From>
-inline auto cast(const From& from)
+inline auto cast(const From& from, bool* pOK)
 {
     using TFrom = typename TypeWarper<remove_cr<From>>::type;
     using TTo = typename TypeWarper<remove_cr<To>>::type;
 
     static_assert(!std::is_pointer_v<TFrom> || !is_object<std::remove_pointer_t<TFrom>>);
     static_assert(!std::is_pointer_v<TTo> || !is_object<std::remove_pointer_t<TTo>>);
+
+    if (pOK != nullptr)
+        *pOK = true;
 
     if constexpr (is_object<TFrom>)
     {
@@ -175,7 +178,7 @@ inline auto cast(const From& from)
 
             if constexpr (std::is_same_v<std::weak_ptr<TFrom>, From>)
             {
-                return cast<To>(from.lock());
+                return cast<To>(from.lock(), pOK);
             }
             else
             {
@@ -191,10 +194,10 @@ inline auto cast(const From& from)
                         return std::static_pointer_cast<TTo>(target);
                 }
 
-                if constexpr (std::is_same_v<std::shared_ptr<TTo>, To> || std::is_same_v<std::weak_ptr<TTo>, To>)
-                    return To(nullptr);
-                else
-                    return std::shared_ptr<TTo>(nullptr);
+                if (pOK != nullptr)
+                    *pOK = false;
+
+                return std::shared_ptr<TTo>(nullptr);
             }
         }
         else
@@ -203,14 +206,18 @@ inline auto cast(const From& from)
             static_assert(std::is_same_v<From, ObjectPtr>);
             static_assert(std::is_same_v<TTo, remove_cr<To>> || std::is_same_v<TTo, remove_cr<To>*>);
 
-            assert(from != nullptr);
+            if (from != nullptr)
+            {
+                if (from->GetRttiType() == type_of<TTo>() || from->GetRttiType() == type_of<std::remove_pointer_t<TTo>>())
+                    return Unbox<TTo>(from);
 
-            if (from->GetRttiType() == type_of<TTo>() || from->GetRttiType() == type_of<std::remove_pointer_t<TTo>>())
-                return Unbox<TTo>(from);
+                ObjectPtr target = nullptr;
+                if (Type::Convert(from, type_of<TTo>(), target))
+                    return Unbox<TTo>(target);
+            }
 
-            ObjectPtr target = nullptr;
-            if (Type::Convert(from, type_of<TTo>(), target))
-                return Unbox<TTo>(target);
+            if (pOK != nullptr)
+                *pOK = false;
 
             RTTI_ERROR((std::string("conversion of ") + from->GetRttiType()->GetName() + std::string(" to ") + type_of<TTo>()->GetName() + std::string(" is not allowed ")).c_str());
             return TTo();
@@ -229,6 +236,9 @@ inline auto cast(const From& from)
             if (Type::Convert(Box(from), type_of<TTo>(), target))
                 return std::static_pointer_cast<TTo>(target);
 
+            if (pOK != nullptr)
+                *pOK = false;
+
             return std::shared_ptr<TTo>(nullptr);
         }
         else
@@ -241,6 +251,9 @@ inline auto cast(const From& from)
             ObjectPtr target = nullptr;
             if (Type::Convert(Box(from), type_of<TTo>(), target))
                 return Unbox<TTo>(target);
+
+            if (pOK != nullptr)
+                *pOK = false;
 
             RTTI_ERROR((std::string("conversion of ") + type_of<TFrom>()->GetName() + std::string(" to ") + type_of<TTo>()->GetName() + std::string(" is not allowed ")).c_str());
             return TTo();

@@ -117,5 +117,7 @@ public:                                              \
     virtual rtti::Type* GetRttiType() const override \
     {                                                \
         return ClassType();                          \
-    }
+    }                                                \
+    template <class T, class... Args>                \
+    friend rtti::ObjectPtr rtti::ctor(Args... args);
 } // namespace rtti

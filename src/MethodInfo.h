@@ -7,14 +7,14 @@
 namespace
 {
 template <typename Tuple, typename Iterator, std::size_t... I>
-static Tuple MakeArgsImpl(Iterator p, std::index_sequence<I...>)
+static Tuple MakeArgsImpl(const Iterator& p, std::index_sequence<I...>)
 {
     return Tuple(rtti::cast<std::tuple_element_t<I, Tuple>>(p[I])...);
 }
 
 // 将 Iterator 里的 ObjectPtr 逐个转换为 Args 对应的类型，并放在 tuple 里
-template <typename Iterator, typename... Args>
-static auto MakeArgs(Iterator p)
+template <typename... Args, typename Iterator>
+static auto MakeArgs(const Iterator& p)
 {
     static_assert(std::is_same_v<rtti::remove_cr<decltype(p[0])>, rtti::ObjectPtr>, "Iterator type must be ObjectPtr");
 
@@ -99,7 +99,7 @@ public:
                 return nullptr;
             }
 
-            auto args_tuple = MakeArgs<std::vector<ObjectPtr>, Args...>(args);
+            auto args_tuple = MakeArgs<Args...>(args);
             return std::apply([=](Args... args)
                               { return f(std::forward<Args>(args)...); },
                               args_tuple);
@@ -167,19 +167,38 @@ protected:
                     self = Unbox<Host*>(target);
             }
 
-            auto args_tuple = MakeArgs<std::vector<ObjectPtr>, Args...>(args);
+            auto args_tuple = MakeArgs<Args...>(args);
             if constexpr (std::is_void_v<RET>)
             {
-                std::apply([=](Args... a)
-                           { std::invoke(f, self, std::forward<Args>(a)...); },
-                           args_tuple);
+                if constexpr (std::is_member_function_pointer_v<FUNC>)
+                {
+                    std::apply([=](Args... a)
+                               { std::invoke(f, self, std::forward<Args>(a)...); },
+                               args_tuple);
+                }
+                else
+                {
+                    std::apply([=](Args... a)
+                               { std::invoke(f, std::forward<Args>(a)...); },
+                               args_tuple);
+                }
+
                 return nullptr;
             }
             else
             {
-                return std::apply([=](Args... a)
-                                  { return cast<ObjectPtr>(std::invoke(f, self, std::forward<Args>(a)...)); },
-                                  args_tuple);
+                if constexpr (std::is_member_function_pointer_v<FUNC>)
+                {
+                    return std::apply([=](Args... a)
+                                      { return cast<ObjectPtr>(std::invoke(f, self, std::forward<Args>(a)...)); },
+                                      args_tuple);
+                }
+                else
+                {
+                    return std::apply([=](Args... a)
+                                      { return cast<ObjectPtr>(std::invoke(f, std::forward<Args>(a)...)); },
+                                      args_tuple);
+                }
             }
         };
 

@@ -6,20 +6,20 @@
 
 namespace
 {
-template <class T, class... Args>
-rtti::ObjectPtr ctor(Args... args)
-{
-    if constexpr (rtti::is_object<T>)
-        return std::make_shared<T>(std::forward<Args>(args)...);
-    else
-        return rtti::Box(T(std::forward<Args>(args)...));
-}
-
 const std::string empty_string;
 } // namespace
 
 namespace rtti
 {
+template <class T, class... Args>
+inline ObjectPtr ctor(Args... args)
+{
+    if constexpr (is_object<T>)
+        return std::shared_ptr<T>(new T(std::forward<Args>(args)...));
+    else
+        return Box(T(std::forward<Args>(args)...));
+}
+
 template <typename T, bool is_enum = std::is_enum_v<T>, bool is_arithmetic = std::is_arithmetic_v<T>>
 struct TypeRegister
 {
@@ -36,15 +36,6 @@ public:
         type->m_attributes = attributes;
 
         TypeRegister<T> reg;
-
-        if constexpr (std::is_default_constructible<T>::value)
-        {
-            reg.template constructor<>();
-        }
-        if constexpr (!is_object<T> && std::is_copy_constructible<T>::value)
-        {
-            reg.template constructor<const T&>();
-        }
 
         return reg;
     }
@@ -63,7 +54,7 @@ public:
                                                   {
                                                       if constexpr (is_object<T>)
                                                       {
-                                                          std::shared_ptr<T> tobj = cast<T>(obj);
+                                                          std::shared_ptr<T> tobj = cast<std::shared_ptr<T>>(obj);
                                                           if constexpr (is_object<U>)
                                                           {
                                                               std::shared_ptr<U> uobj = nullptr;
@@ -176,7 +167,7 @@ public:
     template <typename R, typename... Args>
     TypeRegister<T>& method(const std::string& name, R (*func)(Args...), const std::map<size_t, std::any>& attributes = {})
     {
-        type_of<T>()->m_methods.push_back(MethodInfo::Register(name, func, attributes));
+        type_of<T>()->m_methods.push_back(MethodInfo::Register<T>(name, func, attributes));
         return *this;
     }
 };

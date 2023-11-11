@@ -63,11 +63,11 @@ public:
         printf("void BaseFunc5(int %d)\n", a);
     }
 
-    //void BaseFunc6(int& a)
+    // void BaseFunc6(int& a)
     //{
-    //    printf("void BaseFunc6(int& %d)\n", a);
-    //    a = 31415926;
-    //}
+    //     printf("void BaseFunc6(int& %d)\n", a);
+    //     a = 31415926;
+    // }
 
     void BaseFunc7(const ObjectPtr& a) const
     {
@@ -151,20 +151,19 @@ public:
         printf("void Func8(TestEnum %d)\n", a);
     }
 
-    template<typename T>
+    template <typename T>
     bool ConvertTo(T& target);
 
-    template<typename T>
+    template <typename T>
     bool ConvertTo(std::shared_ptr<T>& target);
 };
 
-template<>
+template <>
 bool Test::ConvertTo(int& target)
 {
     target = 128;
     return true;
 }
-
 
 struct HandleBase
 {
@@ -185,7 +184,6 @@ protected:
     ObjectPtr m_ptr;
 };
 
-
 template <typename T>
 struct Handle : public HandleBase
 {
@@ -203,7 +201,7 @@ public:
     {
     }
 
-    T* operator ->() const
+    T* operator->() const
     {
         return static_cast<T*>(m_ptr.get());
     }
@@ -252,10 +250,12 @@ void RegisterTypes()
         .value("Value2", TestEnum::Value2);
 
     TypeRegister<TestStruct>::New("TestStruct"s)
+        .constructor<>()
         .convert<int>()
         .property("TE"s, &TestStruct::TE);
 
     TypeRegister<TestBase>::New("TestBase"s)
+        .constructor<>()
         .property("TestBaseA"s, &TestBase::TestBaseA)
         .method("Func1"s, &TestBase::Func1)
         .method("BaseFunc2"s, &TestBase::BaseFunc2)
@@ -266,6 +266,7 @@ void RegisterTypes()
         .method("BaseFunc7"s, &TestBase::BaseFunc7);
 
     TypeRegister<Test>::New("Test"s)
+        .constructor<>()
         .constructor<int>()
         .constructor<int, float>()
         .convert<int>()
@@ -304,17 +305,18 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char* argv[])
     assert(type_of<TestEnum2>()->CanConvertTo<int32_t>());
 
     assert(type_of<Test>() == type_of<std::shared_ptr<Test>>());
+    assert(type_of<Test>()->CanConvertTo<int32_t>());
 
     Handle<TestBase> ht = Handle<Test>(std::make_shared<Test>());
-    
+
     assert(ht->GetRttiType() == type_of<Test>());
-    
+
     ObjectPtr box_ht = rtti::Box(ht);
     printf("box_ht --> %s", box_ht->GetRttiType()->GetName().c_str());
 
     Type* inner_type = std::any_cast<Type*>(box_ht->GetRttiType()->GetAttribute(HASH("handle")));
     assert(inner_type == type_of<TestBase>());
-    
+
     auto ht2 = cast<HandleBase>(box_ht).GetPtr();
     assert(ht2 == ht.GetPtr());
 
@@ -330,6 +332,14 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char* argv[])
     auto obj = type->Create<Test>();
     auto obj1 = type->Create<Test>(123);
     auto obj2 = type->Create<Test>(123, 789.12f);
+
+    ObjectPtr ttt;
+    Type::Convert(obj, type_of<int>(), ttt);
+
+    assert(cast<int>(ttt) == 128);
+
+    assert(cast<TestBase>(obj) != nullptr);
+    assert(cast<Test>(cast<TestBase>(obj)) != nullptr);
 
     obj->A = 123;
     obj->B = "str"s;
