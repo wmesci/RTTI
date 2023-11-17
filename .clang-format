@@ -33,8 +33,6 @@ BraceWrapping:
   IndentBraces:          true
   BeforeLambdaBody:      false
 BreakBeforeBraces: Allman
-MacroBlockBegin: '(TYPE_DEFINE_BEGIN)'
-MacroBlockEnd: '(ENUM_END|TYPE_DEFINE_END)'
 # > llvm v6.0.0
 BreakInheritanceList: BeforeComma
 AlwaysBreakTemplateDeclarations: Yes
