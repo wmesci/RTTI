@@ -12,15 +12,15 @@ const std::string empty_string;
 namespace rtti
 {
 template <class T, class... Args>
-inline ObjectPtr ctor(Args... args)
+inline rtti::ObjectPtr ctor(Args... args)
 {
-    if constexpr (is_object<T>)
+    if constexpr (rtti::is_object<T>)
         return std::shared_ptr<T>(new T(std::forward<Args>(args)...));
     else
-        return Box(T(std::forward<Args>(args)...));
+        return rtti::Box(T(std::forward<Args>(args)...));
 }
 
-template <typename T, bool is_enum = std::is_enum_v<T>, bool is_arithmetic = std::is_arithmetic_v<T>>
+template <typename T, bool is_enum = std::is_enum_v<T>>
 struct TypeRegister
 {
 private:
@@ -36,6 +36,13 @@ public:
         type->m_attributes = attributes;
 
         TypeRegister<T> reg;
+
+        // if constexpr(!is_object<T>)
+        //{
+        //     if constexpr(std::)
+        //     type->m_constructors.push_back(ConstructorInfo::Register<T>(&ctor<T>));
+        //     type->m_constructors.push_back(ConstructorInfo::Register<T>(&ctor<T, const T&>));
+        // }
 
         return reg;
     }
@@ -93,73 +100,64 @@ public:
     }
 
     // R / R& / const R&
-    template <typename R>
-    TypeRegister<T>& property(const std::string& name, R (T::*getter)(), void (T::*setter)(R), const std::map<size_t, std::any>& attributes = {})
+    template <typename R, typename U = std::remove_pointer_t<T>, std::enable_if_t<!std::is_arithmetic_v<U>, bool> = true>
+    TypeRegister<T>& property(const std::string& name, R (U::*getter)(), void (U::*setter)(R), const std::map<size_t, std::any>& attributes = {})
     {
-        type_of<T>()->m_properties.push_back(PropertyInfo::Register(name, getter, setter, attributes));
+        type_of<T>()->m_properties.push_back(new PropertyInfo(type_of<T>(), name, type_of<R>(), MethodInfo::Register<T, decltype(getter), R>(name, getter), MethodInfo::Register<T, decltype(setter), void, R>(name, setter), attributes));
         return *this;
     }
 
     // R / R& / const R&
-    template <typename R>
-    TypeRegister<T>& property(const std::string& name, R (T::*getter)(), const std::map<size_t, std::any>& attributes = {})
+    template <typename R, typename U = std::remove_pointer_t<T>, std::enable_if_t<!std::is_arithmetic_v<U>, bool> = true>
+    TypeRegister<T>& property(const std::string& name, R (U::*getter)(), const std::map<size_t, std::any>& attributes = {})
     {
-        type_of<T>()->m_properties.push_back(PropertyInfo::Register(name, getter, attributes));
+        type_of<T>()->m_properties.push_back(new PropertyInfo(type_of<T>(), name, type_of<R>(), MethodInfo::Register<T, decltype(getter), R>(name, getter), nullptr, attributes));
         return *this;
     }
 
     // R / R& / const R&
-    template <typename R>
-    TypeRegister<T>& property(const std::string& name, R (T::*getter)() const, void (T::*setter)(R), const std::map<size_t, std::any>& attributes = {})
+    template <typename R, typename U = std::remove_pointer_t<T>, std::enable_if_t<!std::is_arithmetic_v<U>, bool> = true>
+    TypeRegister<T>& property(const std::string& name, R (U::*getter)() const, void (U::*setter)(R), const std::map<size_t, std::any>& attributes = {})
     {
-        type_of<T>()->m_properties.push_back(PropertyInfo::Register(name, getter, setter, attributes));
+        type_of<T>()->m_properties.push_back(new PropertyInfo(type_of<T>(), name, type_of<R>(), MethodInfo::Register<T, decltype(getter), R>(name, getter), MethodInfo::Register<T, decltype(setter), void, R>(name, setter), attributes));
         return *this;
     }
 
     // R / R& / const R&
-    template <typename R>
-    TypeRegister<T>& property(const std::string& name, R (T::*getter)() const, const std::map<size_t, std::any>& attributes = {})
+    template <typename R, typename U = std::remove_pointer_t<T>, std::enable_if_t<!std::is_arithmetic_v<U>, bool> = true>
+    TypeRegister<T>& property(const std::string& name, R (U::*getter)() const, const std::map<size_t, std::any>& attributes = {})
     {
-        type_of<T>()->m_properties.push_back(PropertyInfo::Register(name, getter, attributes));
+        type_of<T>()->m_properties.push_back(new PropertyInfo(type_of<T>(), name, type_of<R>(), MethodInfo::Register<T, decltype(getter), R>(name, getter), nullptr, attributes));
         return *this;
     }
 
     // field
-    template <typename R, bool READONLY = false>
-    TypeRegister<T>& property(const std::string& name, R T::*field, const std::map<size_t, std::any>& attributes = {})
+    template <typename R, bool READONLY = false, typename U = std::remove_pointer_t<T>, std::enable_if_t<!std::is_arithmetic_v<U>, bool> = true>
+    TypeRegister<T>& property(const std::string& name, R U::*field, const std::map<size_t, std::any>& attributes = {})
     {
-        PropertyGetter getter = [field](const ObjectPtr& obj)
-        {
-            return cast<ObjectPtr>((*getSelf<T>(obj)).*field);
-        };
-
+        MethodInfo* getter = MethodInfo::Register<T, decltype(field), R>(name, field);
         if constexpr (READONLY || std::is_const_v<std::remove_reference_t<R>>)
         {
-            type_of<T>()->m_properties.push_back(PropertyInfo::Register<T, R>(name, getter, PropertySetter(), attributes));
+            type_of<T>()->m_properties.push_back(new PropertyInfo(type_of<T>(), name, type_of<R>(), getter, nullptr, attributes));
         }
         else
         {
-            PropertySetter setter = [field](const ObjectPtr& obj, const ObjectPtr& value)
-            {
-                (*getSelf<T>(obj)).*field = cast<remove_cr<R>>(value);
-            };
-
-            type_of<T>()->m_properties.push_back(PropertyInfo::Register<T, R>(name, getter, setter, attributes));
+            type_of<T>()->m_properties.push_back(new PropertyInfo(type_of<T>(), name, type_of<R>(), getter, MethodInfo::Register<T, decltype(field), void, R>(name, field), attributes));
         }
         return *this;
     }
 
-    template <typename R, typename... Args>
-    TypeRegister<T>& method(const std::string& name, R (T::*func)(Args...), const std::map<size_t, std::any>& attributes = {})
+    template <typename R, typename... Args, typename U = std::remove_pointer_t<T>, std::enable_if_t<!std::is_arithmetic_v<U>, bool> = true>
+    TypeRegister<T>& method(const std::string& name, R (U::*func)(Args...), const std::map<size_t, std::any>& attributes = {})
     {
-        type_of<T>()->m_methods.push_back(MethodInfo::Register(name, func, attributes));
+        type_of<T>()->m_methods.push_back(MethodInfo::Register<T, decltype(func), R, Args...>(name, func, attributes));
         return *this;
     }
 
-    template <typename R, typename... Args>
-    TypeRegister<T>& method(const std::string& name, R (T::*func)(Args...) const, const std::map<size_t, std::any>& attributes = {})
+    template <typename R, typename... Args, typename U = std::remove_pointer_t<T>, std::enable_if_t<!std::is_arithmetic_v<U>, bool> = true>
+    TypeRegister<T>& method(const std::string& name, R (U::*func)(Args...) const, const std::map<size_t, std::any>& attributes = {})
     {
-        type_of<T>()->m_methods.push_back(MethodInfo::Register(name, func, attributes));
+        type_of<T>()->m_methods.push_back(MethodInfo::Register<T, decltype(func), R, Args...>(name, func, attributes));
         return *this;
     }
 
@@ -167,19 +165,19 @@ public:
     template <typename R, typename... Args>
     TypeRegister<T>& method(const std::string& name, R (*func)(Args...), const std::map<size_t, std::any>& attributes = {})
     {
-        type_of<T>()->m_methods.push_back(MethodInfo::Register<T>(name, func, attributes));
+        type_of<T>()->m_methods.push_back(MethodInfo::Register<T, decltype(func), R, Args...>(name, func, attributes));
         return *this;
     }
 };
 
 template <typename T>
-struct TypeRegister<T, true, false>
+struct TypeRegister<T, true>
 {
 private:
     TypeRegister() = default;
 
 public:
-    // 注册枚举类型
+    // 注册新类型
     static TypeRegister<T> New(const std::string& name = empty_string, const std::map<size_t, std::any>& attributes = {})
     {
         Type* type = type_of<T>();
@@ -197,30 +195,6 @@ public:
     {
         type_of<T>()->m_enumValues.push_back({.number = (int64_t)v, .value = Box(v), .name = name});
         return *this;
-    }
-};
-
-template <typename T>
-struct TypeRegister<T, false, true>
-{
-private:
-    TypeRegister() = default;
-
-public:
-    // 注册值类型
-    static TypeRegister<T> New(const std::string& name = empty_string, const std::map<size_t, std::any>& attributes = {})
-    {
-        Type* type = type_of<T>();
-        if (!name.empty())
-            type->m_name = name;
-        type->m_attributes = attributes;
-
-        TypeRegister<T> reg;
-
-        type->m_constructors.push_back(ConstructorInfo::Register<T>(&ctor<T>));
-        type->m_constructors.push_back(ConstructorInfo::Register<T>(&ctor<T, const T&>));
-
-        return reg;
     }
 };
 

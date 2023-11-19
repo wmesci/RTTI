@@ -126,7 +126,23 @@ private:
     MethodFlags m_flags = MethodFlags::None;
     std::function<ObjectPtr(const ObjectPtr&, const std::vector<ObjectPtr>&)> m_func;
 
-protected:
+public:
+    bool IsStatic() const
+    {
+        return ((int32_t)m_flags & (int32_t)MethodFlags::Static) != 0;
+    }
+
+    ObjectPtr Invoke(const ObjectPtr& target, const std::vector<ObjectPtr>& args)
+    {
+        return m_func(target, args);
+    }
+
+    template <typename... Args>
+    ObjectPtr Invoke(const ObjectPtr& target, Args... args)
+    {
+        return m_func(target, {Box(args)...});
+    }
+
     MethodInfo(Type* owner, const std::string& name, MethodFlags flags, Type* rettype, std::initializer_list<ParameterInfo> arguments, std::function<ObjectPtr(const ObjectPtr&, const std::vector<ObjectPtr>&)> func, const std::map<size_t, std::any>& attributes)
         : MethodBase(owner, name, rettype, arguments, attributes)
         , m_flags(flags)
@@ -135,7 +151,7 @@ protected:
     }
 
     template <typename Host, typename FUNC, typename RET, typename... Args>
-    static MethodInfo* RegisterImpl(const std::string& name, MethodFlags flags, FUNC f, const std::map<size_t, std::any>& attributes)
+    static MethodInfo* Register(const std::string& name, FUNC f, const std::map<size_t, std::any>& attributes = {})
     {
         std::function<ObjectPtr(const ObjectPtr&, const std::vector<ObjectPtr>&)> func = [=](const ObjectPtr& target, const std::vector<ObjectPtr>& args) -> ObjectPtr
         {
@@ -145,10 +161,12 @@ protected:
                 return nullptr;
             }
 
-            Host* self = nullptr;
-            if (((int32_t)flags & (int32_t)MethodFlags::Static) == 0)
+            using SelfType = std::remove_pointer_t<Host>;
+
+            SelfType* self = nullptr;
+            if constexpr (std::is_member_function_pointer_v<FUNC> || std::is_member_object_pointer_v<FUNC>)
             {
-                // 成员函数调用
+                // 成员函数 / 变量调用
                 if (target == nullptr)
                 {
                     RTTI_ERROR(std::string("target cannot be nullptr").c_str());
@@ -162,9 +180,9 @@ protected:
                 }
 
                 if constexpr (is_object<Host>)
-                    self = static_cast<Host*>(target.get());
+                    self = static_cast<SelfType*>(target.get());
                 else
-                    self = Unbox<Host*>(target);
+                    self = Unbox<SelfType*>(target);
             }
 
             auto args_tuple = MakeArgs<Args...>(args);
@@ -176,13 +194,17 @@ protected:
                                { std::invoke(f, self, std::forward<Args>(a)...); },
                                args_tuple);
                 }
+                else if constexpr (std::is_member_object_pointer_v<FUNC>)
+                {
+                    static_assert(sizeof...(Args) == 1);
+                    (self->*f) = std::get<0>(args_tuple);
+                }
                 else
                 {
                     std::apply([=](Args... a)
                                { std::invoke(f, std::forward<Args>(a)...); },
                                args_tuple);
                 }
-
                 return nullptr;
             }
             else
@@ -192,6 +214,11 @@ protected:
                     return std::apply([=](Args... a)
                                       { return cast<ObjectPtr>(std::invoke(f, self, std::forward<Args>(a)...)); },
                                       args_tuple);
+                }
+                else if constexpr (std::is_member_object_pointer_v<FUNC>)
+                {
+                    static_assert(sizeof...(Args) == 0);
+                    return cast<ObjectPtr>(self->*f);
                 }
                 else
                 {
@@ -212,45 +239,7 @@ protected:
             rettype = type_of<RET>();
         }
 
-        return new MethodInfo(type_of<Host>(), name, flags, rettype, {GetParameterInfo<Args>()...}, func, attributes);
-    }
-
-public:
-    bool IsStatic() const
-    {
-        return ((int32_t)m_flags & (int32_t)MethodFlags::Static) != 0;
-    }
-
-    ObjectPtr Invoke(const ObjectPtr& target, const std::vector<ObjectPtr>& args)
-    {
-        return m_func(target, args);
-    }
-
-    template <typename... Args>
-    ObjectPtr Invoke(const ObjectPtr& target, Args... args)
-    {
-        return m_func(target, {Box(args)...});
-    }
-
-    // member function
-    template <typename Host, typename RET, typename... Args>
-    static MethodInfo* Register(const std::string& name, RET (Host::*FUNC)(Args...), const std::map<size_t, std::any>& attributes = {})
-    {
-        return RegisterImpl<Host, decltype(FUNC), RET, Args...>(name, MethodFlags::None, FUNC, attributes);
-    }
-
-    // member function
-    template <typename Host, typename RET, typename... Args>
-    static MethodInfo* Register(const std::string& name, RET (Host::*FUNC)(Args...) const, const std::map<size_t, std::any>& attributes = {})
-    {
-        return RegisterImpl<Host, decltype(FUNC), RET, Args...>(name, MethodFlags::None, FUNC, attributes);
-    }
-
-    // static function
-    template <typename Host, typename RET, typename... Args>
-    static MethodInfo* Register(const std::string& name, RET (*FUNC)(Args...), const std::map<size_t, std::any>& attributes = {})
-    {
-        return RegisterImpl<Host, decltype(FUNC), RET, Args...>(name, MethodFlags::Static, FUNC, attributes);
+        return new MethodInfo(type_of<Host>(), name, std::is_member_function_pointer_v<FUNC> ? MethodFlags::None : MethodFlags::Static, rettype, {GetParameterInfo<Args>()...}, func, attributes);
     }
 };
 } // namespace rtti

@@ -19,7 +19,7 @@ struct TypeConvertor
 class Type : public Attributable
 {
 private:
-    template <typename T, bool, bool>
+    template <typename T, bool>
     friend struct TypeRegister;
 
     template <typename T>
@@ -219,7 +219,7 @@ inline auto cast(const From& from, bool* pOK)
             if (pOK != nullptr)
                 *pOK = false;
 
-            RTTI_ERROR((std::string("conversion of ") + from->GetRttiType()->GetName() + std::string(" to ") + type_of<TTo>()->GetName() + std::string(" is not allowed ")).c_str());
+            RTTI_ERROR((std::string("conversion of ") + (from == nullptr ? std::string("nullptr") : from->GetRttiType()->GetName()) + std::string(" to ") + type_of<TTo>()->GetName() + std::string(" is not allowed ")).c_str());
             return TTo();
         }
     }

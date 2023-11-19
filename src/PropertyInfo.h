@@ -3,31 +3,24 @@
 #include "Object.h"
 #include "ObjectBox.h"
 #include "Attributable.h"
+#include "MethodInfo.h"
 
 namespace rtti
 {
-using PropertyGetter = std::function<ObjectPtr(const ObjectPtr&)>;
-using PropertySetter = std::function<void(const ObjectPtr&, const ObjectPtr&)>;
-
-template <typename T>
-inline T* getSelf(const ObjectPtr& obj)
-{
-    if constexpr (is_object<T>)
-        return static_cast<T*>(obj.get());
-    else
-        return Unbox<T*>(obj);
-}
-
 class PropertyInfo : public Attributable
 {
+private:
+    template <typename T, bool>
+    friend struct TypeRegister;
+
 private:
     Type* owner;
     std::string name;
     Type* type;
-    const PropertyGetter getter;
-    const PropertySetter setter;
+    MethodInfo* getter;
+    MethodInfo* setter;
 
-    PropertyInfo(Type* owner, const std::string& name, Type* type, const PropertyGetter& getter, const PropertySetter& setter, const std::map<size_t, std::any>& attributes)
+    PropertyInfo(Type* owner, const std::string& name, Type* type, MethodInfo* getter, MethodInfo* setter, const std::map<size_t, std::any>& attributes)
         : Attributable(attributes)
         , owner(owner)
         , name(name)
@@ -50,7 +43,7 @@ public:
 
     ObjectPtr GetValue(const ObjectPtr& obj) const
     {
-        return getter(obj);
+        return getter->Invoke(obj, {});
     }
 
     template <typename T>
@@ -61,87 +54,8 @@ public:
 
     void SetValue(const ObjectPtr& obj, const ObjectPtr& value) const
     {
-        setter(obj, value);
-    }
-
-    template <typename Host, typename T>
-    static PropertyInfo* Register(const std::string& name, const PropertyGetter& getter, const PropertySetter& setter, const std::map<size_t, std::any>& attributes = {})
-    {
-        return new PropertyInfo(type_of<Host>(), name, type_of<T>(), getter, setter, attributes);
-    }
-
-    // 注册实例只读属性
-    template <typename Host, typename T>
-    static PropertyInfo* Register(const std::string& name, T (Host::*getter)(), const std::map<size_t, std::any>& attributes = {})
-    {
-        assert(getter != nullptr);
-        return Register<Host, T>(
-            name, [=](const ObjectPtr& obj)
-            { return cast<ObjectPtr>((getSelf<Host>(obj)->*getter)()); },
-            nullptr);
-    }
-
-    // 注册实例只读属性
-    template <typename Host, typename T>
-    static PropertyInfo* Register(const std::string& name, T (Host::*getter)() const, const std::map<size_t, std::any>& attributes = {})
-    {
-        assert(getter != nullptr);
-        return Register<Host, T>(
-            name, [=](const ObjectPtr& obj)
-            { return cast<ObjectPtr>((getSelf<Host>(obj)->*getter)()); },
-            nullptr);
-    }
-
-    // 注册实例属性
-    template <typename Host, typename T>
-    static PropertyInfo* Register(const std::string& name, T (Host::*getter)(), void (Host::*setter)(T), const std::map<size_t, std::any>& attributes = {})
-    {
-        PropertyGetter warpgetter = (getter == nullptr ? PropertyGetter(nullptr) : (PropertyGetter)[=](const ObjectPtr& obj) {
-            return cast<ObjectPtr>((getSelf<Host>(obj)->*getter)());
-        });
-        PropertySetter warpsetter = (setter == nullptr ? PropertySetter(nullptr) : (PropertySetter)[=](const ObjectPtr& obj, const ObjectPtr& value) {
-            (getSelf<Host>(obj)->*setter)(cast<T>(value));
-        });
-        return Register<Host, T>(name, warpgetter, warpsetter);
-    }
-
-    // 注册实例属性
-    template <typename Host, typename T>
-    static PropertyInfo* Register(const std::string& name, T (Host::*getter)() const, void (Host::*setter)(T), const std::map<size_t, std::any>& attributes = {})
-    {
-        PropertyGetter warpgetter = (getter == nullptr ? PropertyGetter(nullptr) : (PropertyGetter)[=](const ObjectPtr& obj) {
-            return cast<ObjectPtr>((getSelf<Host>(obj)->*getter)());
-        });
-        PropertySetter warpsetter = (setter == nullptr ? PropertySetter(nullptr) : (PropertySetter)[=](const ObjectPtr& obj, const ObjectPtr& value) {
-            (getSelf<Host>(obj)->*setter)(cast<T>(value));
-        });
-        return Register<Host, T>(name, warpgetter, warpsetter);
-    }
-
-    // 注册实例属性
-    template <typename Host, typename T>
-    static PropertyInfo* Register(const std::string& name, T (Host::*getter)(), void (Host::*setter)(const T&), const std::map<size_t, std::any>& attributes = {})
-    {
-        PropertyGetter warpgetter = (getter == nullptr ? PropertyGetter(nullptr) : (PropertyGetter)[=](const ObjectPtr& obj) {
-            return cast<ObjectPtr>((getSelf<Host>(obj)->*getter)());
-        });
-        PropertySetter warpsetter = (setter == nullptr ? PropertySetter(nullptr) : (PropertySetter)[=](const ObjectPtr& obj, const ObjectPtr& value) {
-            (getSelf<Host>(obj)->*setter)(cast<T>(value));
-        });
-        return Register<Host, T>(name, warpgetter, warpsetter);
-    }
-
-    // 注册实例属性
-    template <typename Host, typename T>
-    static PropertyInfo* Register(const std::string& name, T (Host::*getter)() const, void (Host::*setter)(const T&), const std::map<size_t, std::any>& attributes = {})
-    {
-        PropertyGetter warpgetter = (getter == nullptr ? PropertyGetter(nullptr) : (PropertyGetter)[=](const ObjectPtr& obj) {
-            return cast<ObjectPtr>((getSelf<Host>(obj)->*getter)());
-        });
-        PropertySetter warpsetter = (setter == nullptr ? PropertySetter(nullptr) : (PropertySetter)[=](const ObjectPtr& obj, const ObjectPtr& value) {
-            (getSelf<Host>(obj)->*setter)(cast<T>(value));
-        });
-        return Register<Host, T>(name, warpgetter, warpsetter);
+        if (setter != nullptr)
+            setter->Invoke(obj, {value});
     }
 };
 } // namespace rtti

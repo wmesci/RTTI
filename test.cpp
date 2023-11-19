@@ -250,12 +250,10 @@ void RegisterTypes()
         .value("Value2", TestEnum::Value2);
 
     TypeRegister<TestStruct>::New("TestStruct"s)
-        .constructor<>()
         .convert<int>()
         .property("TE"s, &TestStruct::TE);
 
     TypeRegister<TestBase>::New("TestBase"s)
-        .constructor<>()
         .property("TestBaseA"s, &TestBase::TestBaseA)
         .method("Func1"s, &TestBase::Func1)
         .method("BaseFunc2"s, &TestBase::BaseFunc2)
@@ -337,6 +335,8 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char* argv[])
     Type::Convert(obj, type_of<int>(), ttt);
 
     assert(cast<int>(ttt) == 128);
+    assert(cast<uint16_t>(ttt) == 128);
+    assert(abs(cast<double>(ttt) - 128.0) <= 0.0001);
 
     assert(cast<TestBase>(obj) != nullptr);
     assert(cast<Test>(cast<TestBase>(obj)) != nullptr);
