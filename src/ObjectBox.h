@@ -63,14 +63,12 @@ public:
     }
 };
 
-// 装箱
 template <typename T>
 inline std::enable_if_t<!is_object<typename TypeWarper<remove_cr<T>>::type>, ObjectPtr> Box(T value)
 {
     return std::make_shared<Boxed<T>>(value);
 }
 
-// 拆箱
 //  Unbox<int>(...)   int   int&   int*
 template <typename T>
 inline std::enable_if_t<!is_object<typename TypeWarper<remove_cr<T>>::type>, T> Unbox(const ObjectPtr& ptr)

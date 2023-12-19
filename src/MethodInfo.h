@@ -12,7 +12,7 @@ static Tuple MakeArgsImpl(const Iterator& p, std::index_sequence<I...>)
     return Tuple(rtti::cast<std::tuple_element_t<I, Tuple>>(p[I])...);
 }
 
-// 将 Iterator 里的 ObjectPtr 逐个转换为 Args 对应的类型，并放在 tuple 里
+// Convert each ObjectPtr in the Iterator to the type corresponding to Args and place it in a tuple.
 template <typename... Args, typename Iterator>
 static auto MakeArgs(const Iterator& p)
 {
@@ -27,10 +27,7 @@ static rtti::ParameterInfo GetParameterInfo()
 {
     static_assert(std::is_reference_v<T> == std::is_const_v<std::remove_reference_t<T>>);
 
-    return rtti::ParameterInfo{
-        .Type = rtti::type_of<T>(),
-        .IsRef = std::is_reference_v<T>,
-        .IsConst = std::is_const_v<std::remove_reference_t<T>>};
+    return {rtti::type_of<T>(), std::is_reference_v<T>, std::is_const_v<std::remove_reference_t<T>>};
 }
 } // namespace
 
@@ -166,7 +163,7 @@ public:
             SelfType* self = nullptr;
             if constexpr (std::is_member_function_pointer_v<FUNC> || std::is_member_object_pointer_v<FUNC>)
             {
-                // 成员函数 / 变量调用
+                // call menber function / field
                 if (target == nullptr)
                 {
                     RTTI_ERROR(std::string("target cannot be nullptr").c_str());

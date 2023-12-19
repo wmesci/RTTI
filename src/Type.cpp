@@ -251,13 +251,13 @@ CompareResult Type::Compare(const ObjectPtr& left, const ObjectPtr& right)
 
 ObjectPtr Type::CreateInstance(const std::vector<ObjectPtr>& args) const
 {
-    for (int i = 0; i < m_constructors.size(); i++)
+    for (size_t i = 0; i < m_constructors.size(); i++)
     {
         auto ctor = m_constructors[i];
         if (ctor->GetParameters().size() == args.size())
         {
             bool ok = true;
-            for (int j = 0; j < args.size(); j++)
+            for (size_t j = 0; j < args.size(); j++)
             {
                 auto pt = ctor->GetParameters()[j];
                 if (pt.Type->IsValueType())
@@ -293,7 +293,7 @@ const std::vector<ConstructorInfo*>& Type::GetConstructors() const
 
 ConstructorInfo* Type::GetConstructor() const
 {
-    for (int i = 0; i < m_constructors.size(); i++)
+    for (size_t i = 0; i < m_constructors.size(); i++)
     {
         auto ctor = m_constructors[i];
         if (0 == ctor->GetParameters().size())
@@ -306,13 +306,13 @@ ConstructorInfo* Type::GetConstructor() const
 
 ConstructorInfo* Type::GetConstructor(std::initializer_list<Type*> args) const
 {
-    for (int i = 0; i < m_constructors.size(); i++)
+    for (size_t i = 0; i < m_constructors.size(); i++)
     {
         auto ctor = m_constructors[i];
         if (args.size() == ctor->GetParameters().size())
         {
             bool paramMatch = true;
-            for (int i = 0; i < ctor->GetParameters().size(); i++)
+            for (size_t i = 0; i < ctor->GetParameters().size(); i++)
             {
                 auto p = ctor->GetParameters()[i];
                 if (p.Type != args.begin()[i])
@@ -330,13 +330,13 @@ ConstructorInfo* Type::GetConstructor(std::initializer_list<Type*> args) const
 
 ConstructorInfo* Type::GetConstructor(std::initializer_list<ParameterInfo> args) const
 {
-    for (int i = 0; i < m_constructors.size(); i++)
+    for (size_t i = 0; i < m_constructors.size(); i++)
     {
         auto ctor = m_constructors[i];
         if (args.size() == ctor->GetParameters().size())
         {
             bool paramMatch = true;
-            for (int i = 0; i < ctor->GetParameters().size(); i++)
+            for (size_t i = 0; i < ctor->GetParameters().size(); i++)
             {
                 const auto& p = ctor->GetParameters()[i];
                 const auto& ap = args.begin()[i];
@@ -370,7 +370,7 @@ MethodInfo* Type::GetMethod(const std::string& name) const
     auto curType = this;
     while (curType != nullptr)
     {
-        for (int i = 0; i < curType->m_methods.size(); i++)
+        for (size_t i = 0; i < curType->m_methods.size(); i++)
         {
             auto m = curType->m_methods[i];
             if (m->GetName() == name)
@@ -388,13 +388,13 @@ MethodInfo* Type::GetMethod(const std::string& name, std::initializer_list<Type*
     auto curType = this;
     while (curType != nullptr)
     {
-        for (int i = 0; i < curType->m_methods.size(); i++)
+        for (size_t i = 0; i < curType->m_methods.size(); i++)
         {
             auto m = curType->m_methods[i];
             if (m->GetName() == name && args.size() == m->GetParameters().size())
             {
                 bool paramMatch = true;
-                for (int i = 0; i < m->GetParameters().size(); i++)
+                for (size_t i = 0; i < m->GetParameters().size(); i++)
                 {
                     auto p = m->GetParameters()[i];
                     if (p.Type != args.begin()[i])
@@ -418,13 +418,13 @@ MethodInfo* Type::GetMethod(const std::string& name, std::initializer_list<Param
     auto curType = this;
     while (curType != nullptr)
     {
-        for (int i = 0; i < curType->m_methods.size(); i++)
+        for (size_t i = 0; i < curType->m_methods.size(); i++)
         {
             auto m = curType->m_methods[i];
             if (m->GetName() == name && args.size() == m->GetParameters().size())
             {
                 bool paramMatch = true;
-                for (int i = 0; i < m->GetParameters().size(); i++)
+                for (size_t i = 0; i < m->GetParameters().size(); i++)
                 {
                     const auto& p = m->GetParameters()[i];
                     const auto& ap = args.begin()[i];
@@ -461,7 +461,7 @@ PropertyInfo* Type::GetProperty(const std::string& name) const
     auto curType = this;
     while (curType != nullptr)
     {
-        for (int i = 0; i < curType->m_properties.size(); i++)
+        for (size_t i = 0; i < curType->m_properties.size(); i++)
         {
             if (curType->m_properties[i]->GetName() == name)
                 return curType->m_properties[i];

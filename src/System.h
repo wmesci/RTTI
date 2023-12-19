@@ -1,11 +1,15 @@
 ﻿#pragma once
 #if defined(__clang__)
-#define __debugbreak __builtin_debugtrap
+    #define __debugbreak __builtin_debugtrap
+#elif defined(_MSC_VER)
+    #define __PRETTY_FUNCTION__ __FUNCSIG__
 #endif
 
 #include <type_traits>
 #include <cassert>
 #include <string>
+#include <memory>
+#include <functional>
 
 #define RTTI_LOG(x, msg) printf("[" #x "]: %s\n\t\t in %s[%s:%d]\n", (msg), __PRETTY_FUNCTION__, __FILE__, __LINE__)
 

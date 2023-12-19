@@ -127,7 +127,8 @@
         "numbers": "cpp",
         "__bits": "cpp",
         "__verbose_abort": "cpp",
-        "variant": "cpp"
+        "variant": "cpp",
+        "any": "cpp"
     },
     "cmake.configureOnOpen": true,
     //"cmake.configureArgs": [ "-T", "ClangCl" ],

@@ -21,12 +21,6 @@ OPTION(RTTI_BUILD_TEST "Built RTTI Test" OFF)
 IF(RTTI_BUILD_TEST)
     MESSAGE("Build RTTI Test")
 
-    IF (CMAKE_CXX_COMPILER_ID MATCHES "Clang")
-        SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fno-rtti -fno-exceptions -ffunction-sections -fdata-sections -flto -fvisibility=hidden")
-    ELSEIF (CMAKE_CXX_COMPILER_ID MATCHES "MSVC")
-        SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /utf-8 /bigobj /arch:AVX /Zc:preprocessor /Ot /Oi /Qpar /GS /sdl /fp:fast /wd4819 /wd4267 /wd4244 /wd4800 /wd4305 /wd4309")
-    ENDIF()
-
     ADD_EXECUTABLE(${TARGET_NAME}-Test test.cpp)
 
     TARGET_LINK_LIBRARIES(${TARGET_NAME}-Test ${TARGET_NAME})
