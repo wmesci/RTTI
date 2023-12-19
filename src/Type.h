@@ -16,6 +16,22 @@ struct TypeConvertor
     Convertor Convert;
 };
 
+enum class CompareResult
+{
+    Equals,
+    NotEquals,
+    Failed
+};
+
+using Comparer = CompareResult (*)(const ObjectPtr& left, const ObjectPtr& right);
+
+struct ObjectComparer
+{
+    // Type* SourceType;
+    Type* TargetType;
+    Comparer Compare;
+};
+
 class Type : public Attributable
 {
 private:
@@ -25,9 +41,9 @@ private:
     template <typename T>
     friend Type* DefaultEnumRegister(Type* type);
 
-    friend Type* NewType(const std::string& name, size_t size, Type* base);
+    friend Type* NewType(const std::string& name, size_t size, TypeFlags flags, Type* underlyingType, Type* base);
 
-    Type(const std::string& name, size_t size, Type* baseType, const std::map<size_t, std::any>& attributes);
+    Type(const std::string& name, size_t size, TypeFlags flags, Type* underlyingType, Type* baseType, const std::map<size_t, std::any>& attributes);
 
     ~Type() {}
 
@@ -37,6 +53,9 @@ public:
 
     // 类型大小
     size_t GetSize() const { return m_size; }
+
+    // 获取底层类型
+    Type* GetUnderlyingType() const { return m_underlyingType; }
 
     // 基类型
     Type* GetBaseType() const { return m_baseType; }
@@ -50,17 +69,17 @@ public:
         return IsSubClassOf(type_of<T>());
     }
 
-    bool IsBoxedType() const;
+    bool IsValueType() const;
 
     bool IsEnum() const;
+
+    bool IsPointer() const;
 
     const std::vector<EnumInfo>& GetEnumInfos() const;
 
     bool GetEnumInfo(const int64_t& number, EnumInfo* pInfo) const;
 
     bool GetEnumInfo(const std::string& name, EnumInfo* pInfo) const;
-
-    Type* GetEnumUnderlyingType() const;
 
     bool IsAssignableFrom(Type* type) const;
 
@@ -88,9 +107,6 @@ public:
     {
         return CanConvertTo(type_of<T>());
     }
-
-    // 将 obj 转换为目标类型，只支持单次转换
-    static bool Convert(const ObjectPtr& obj, Type* targetType, ObjectPtr& targets);
 
     // 创建当前类型的实例
     ObjectPtr CreateInstance(const std::vector<ObjectPtr>& args) const;
@@ -128,6 +144,14 @@ public:
     // 获取类型的属性
     PropertyInfo* GetProperty(const std::string& name) const;
 
+    // 将 obj 转换为目标类型，只支持单次转换
+    static bool Convert(const ObjectPtr& obj, Type* targetType, ObjectPtr& target);
+
+    // 比较 left 和 right
+    static bool IsComparable(Type* left, Type* right);
+
+    static CompareResult Compare(const ObjectPtr& left, const ObjectPtr& right);
+
     // 根据名称查找类型
     static Type* Find(const std::string& name);
 
@@ -135,16 +159,37 @@ public:
 
 protected:
     std::string m_name;
-    size_t m_size;
+    uint32_t m_size;
+    TypeFlags m_flags;
     Type* m_baseType;
     Type* m_underlyingType = nullptr;
     std::vector<ConstructorInfo*> m_constructors;
     std::vector<MethodInfo*> m_methods;
     std::vector<PropertyInfo*> m_properties;
     std::vector<TypeConvertor> m_typeConvertors;
+    std::vector<ObjectComparer> m_objectComparers;
     std::vector<EnumInfo> m_enumValues;
     Type* next;
 };
+
+// 将 obj 转换为目标类型，只支持单次转换
+inline bool convert(const ObjectPtr& obj, Type* targetType, ObjectPtr& target)
+{
+    return Type::Convert(obj, targetType, target);
+}
+
+// 比较 left 和 right
+template <typename TL, typename TR>
+inline bool is_comparable()
+{
+    return Type::IsComparable(type_of<TL>(), type_of<TR>());
+}
+
+template <typename TL, typename TR>
+inline CompareResult compare(const TL& left, const TR& right)
+{
+    return Type::Compare(cast<ObjectPtr>(left), cast<ObjectPtr>(right));
+}
 
 // 将当前类型转换成指定类型
 // 直接转换：
@@ -209,6 +254,9 @@ inline auto cast(const From& from, bool* pOK)
             if (from != nullptr)
             {
                 if (from->GetRttiType() == type_of<TTo>() || from->GetRttiType() == type_of<std::remove_pointer_t<TTo>>())
+                    return Unbox<TTo>(from);
+
+                if (from->GetRttiType()->IsPointer() && std::is_same_v<TTo, void*>)
                     return Unbox<TTo>(from);
 
                 ObjectPtr target = nullptr;

@@ -58,7 +58,7 @@ constexpr size_t Hash(const char* str, size_t seed = 0)
 template <auto V>
 static constexpr auto force_consteval = V;
 
-#define HASH(str) force_consteval<Hash(str)>
+#define HASH(str) rtti::force_consteval<rtti::Hash(str)>
 
 template <typename T>
 using remove_cr = std::remove_const_t<std::remove_reference_t<T>>;

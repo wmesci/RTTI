@@ -91,22 +91,25 @@ public:
 
     int GetProp1()
     {
-        printf("void Func1()\n");
+        printf("void GetProp1()\n");
+        return 0;
     }
 
     void SetProp1(int v)
     {
-        printf("void Func2() const\n");
+        printf("void SetProp1()\n");
     }
 
     int GetProp2()
     {
-        printf("void Func1()\n");
+        printf("void GetProp2()\n");
+        return 0;
     }
 
     int GetProp3() const
     {
-        printf("void Func1()\n");
+        printf("void GetProp3()\n");
+        return 0;
     }
 
     virtual void Func1() override
@@ -216,7 +219,7 @@ void print(MethodBase* m)
 {
     if (m->ReturnType() == nullptr)
         printf("void ");
-    else if (m->ReturnType()->IsBoxedType())
+    else if (m->ReturnType()->IsValueType())
         printf("%s ", m->ReturnType()->GetName().c_str());
     else
         printf("std::shared_ptr<%s> ", m->ReturnType()->GetName().c_str());
@@ -228,7 +231,7 @@ void print(MethodBase* m)
         if (p.IsConst)
             printf("const ");
 
-        if (p.Type->IsBoxedType())
+        if (p.Type->IsValueType())
             printf("%s", p.Type->GetName().c_str());
         else
             printf("std::shared_ptr<%s>", p.Type->GetName().c_str());
@@ -299,6 +302,8 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char* argv[])
 {
     RegisterTypes();
 
+    printf("%s - %d - %s\n", type_of<int*>()->GetName().c_str(), type_of<int*>()->IsPointer(), type_of<int*>()->GetUnderlyingType()->GetName().c_str());
+
     assert(type_of<TestEnum2>()->IsEnum());
     assert(type_of<TestEnum2>()->CanConvertTo<int32_t>());
 
@@ -312,13 +317,13 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char* argv[])
     ObjectPtr box_ht = rtti::Box(ht);
     printf("box_ht --> %s", box_ht->GetRttiType()->GetName().c_str());
 
-    Type* inner_type = std::any_cast<Type*>(box_ht->GetRttiType()->GetAttribute(HASH("handle")));
+    Type* inner_type = box_ht->GetRttiType()->GetAttribute<rtti::Type*>(HASH("handle"));
     assert(inner_type == type_of<TestBase>());
 
     auto ht2 = cast<HandleBase>(box_ht).GetPtr();
     assert(ht2 == ht.GetPtr());
 
-    assert(std::any_cast<std::string>(type_of<TestEnum>()->GetAttribute(HASH("displayName"))) == "TestEnumForDisplay"s);
+    assert(type_of<TestEnum>()->GetAttribute<std::string>(HASH("displayName")) == "TestEnumForDisplay"s);
 
     assert(type_of<int>() == Box(123)->GetRttiType());
 
@@ -337,6 +342,18 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char* argv[])
     assert(cast<int>(ttt) == 128);
     assert(cast<uint16_t>(ttt) == 128);
     assert(abs(cast<double>(ttt) - 128.0) <= 0.0001);
+    auto comparable_enum_int = is_comparable<TestEnum, int>();
+    assert(comparable_enum_int);
+    auto comparable_int_enum = is_comparable<int, TestEnum>();
+    assert(comparable_int_enum);
+    auto comparable_int_double = is_comparable<int, double>();
+    assert(comparable_int_double);
+    auto comparable_int_string = is_comparable<int, std::string>();
+    assert(!comparable_int_string);
+    assert(compare(ttt, 128.0f) == CompareResult::Equals);
+    assert(compare(0u, ttt) == CompareResult::NotEquals);
+    assert(compare(ttt, std::string("xxx")) == CompareResult::Failed);
+    assert(ttt->GetHashCode() == std::hash<int>()(128));
 
     assert(cast<TestBase>(obj) != nullptr);
     assert(cast<Test>(cast<TestBase>(obj)) != nullptr);
@@ -377,7 +394,7 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char* argv[])
             printf("RW ");
         else
             printf("R  ");
-        if (p->PropertyType()->IsBoxedType())
+        if (p->PropertyType()->IsValueType())
             printf("%s %s", p->PropertyType()->GetName().c_str(), p->GetName().c_str());
         else
             printf("std::shared_ptr<%s> %s", p->PropertyType()->GetName().c_str(), p->GetName().c_str());

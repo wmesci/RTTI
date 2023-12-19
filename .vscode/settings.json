@@ -4,55 +4,12 @@
         "/**", 
         "// "
     ], 
-    "clangTidy.extraCompilerArgs": [
-        "-Weverything", 
-        "-std=c++20"
-    ], 
     "C_Cpp.default.includePath": [
-        "Library/imgui"
     ],
     "C_Cpp.default.defines": [
         "WIN",
         "x64"
     ],
-    "doxdocgen.c.commentPrefix": " * ", 
-    "doxdocgen.c.factoryMethodText": "", 
-    "doxdocgen.c.firstLine": "/**", 
-    "doxdocgen.c.lastLine": " */", 
-    "doxdocgen.c.triggerSequence": "/**", 
-    "doxdocgen.cpp.ctorText": "Constructor", 
-    "doxdocgen.cpp.dtorText": "Destructor", 
-    "doxdocgen.cpp.tparamTemplate": "@tparam {param} ", 
-    "doxdocgen.file.copyrightTag": [
-        "@copyright Copyright (c) {year}"
-    ], 
-    "doxdocgen.file.fileOrder": [
-        "file", 
-        "author", 
-        "brief", 
-        "version", 
-        "date", 
-        "copyright"
-    ], 
-    "doxdocgen.file.fileTemplate": "@file {name}", 
-    "doxdocgen.file.versionTag": "@version ", 
-    "doxdocgen.generic.authorTag": "@author {author} ({email})", 
-    "doxdocgen.generic.boolReturnsTrueFalse": false, 
-    "doxdocgen.generic.briefTemplate": "@brief {text}", 
-    "doxdocgen.generic.dateFormat": "YYYY-MM-DD", 
-    "doxdocgen.generic.dateTemplate": "@date {date}", 
-    "doxdocgen.generic.generateSmartText": true, 
-    "doxdocgen.generic.includeTypeAtReturn": true, 
-    "doxdocgen.generic.linesToGet": 20, 
-    "doxdocgen.generic.order": [
-        "brief", 
-        "tparam", 
-        "param", 
-        "return"
-    ], 
-    "doxdocgen.generic.paramTemplate": "@param {param} ", 
-    "doxdocgen.generic.returnTemplate": "@return {type} ", 
-    "doxdocgen.generic.splitCasingSmartText": true, 
     "editor.defaultFormatter": "xaver.clang-format", 
     "editor.formatOnPaste": true, 
     "editor.formatOnSave": true, 
@@ -171,35 +128,9 @@
         "__bits": "cpp",
         "__verbose_abort": "cpp",
         "variant": "cpp"
-    }, 
-    "todohighlight.keywords": [
-        {
-            "backgroundColor": "rgba(0,0,0,.2)", 
-            "border": "1px solid red", 
-            "borderRadius": "2px", 
-            "color": "red", 
-            "text": "HACK"
-        }, 
-        {
-            "backgroundColor": "#ffbd2a", 
-            "color": "#fff", 
-            "overviewRulerColor": "rgba(255,189,42,0.8)", 
-            "text": "TODO"
-        }, 
-        {
-            "backgroundColor": "#f06292", 
-            "color": "#fff", 
-            "overviewRulerColor": "rgba(240,98,146,0.8)", 
-            "text": "FIXME"
-        }, 
-        {
-            "backgroundColor": "#00BFFF", 
-            "color": "#fff", 
-            "overviewRulerColor": "rgba(0,191,255,0.8)", 
-            "text": "***MODIFYME***"
-        }
-    ],
+    },
     "cmake.configureOnOpen": true,
     //"cmake.configureArgs": [ "-T", "ClangCl" ],
+    "cmake.configureArgs": [ "-D", "RTTI_BUILD_TEST=ON"],
     "C_Cpp.default.configurationProvider": "vector-of-bool.cmake-tools"
 }

@@ -7,6 +7,21 @@
 namespace
 {
 const std::string empty_string;
+
+template <class T, class U>
+inline rtti::CompareResult comparer(const rtti::ObjectPtr& left, const rtti::ObjectPtr& right)
+{
+    bool ok = false;
+    auto t = rtti::cast<T>(left, &ok);
+    if (!ok)
+        return rtti::CompareResult::Failed;
+
+    auto u = rtti::cast<U>(right, &ok);
+    if (!ok)
+        return rtti::CompareResult::Failed;
+
+    return static_cast<U>(t) == u ? rtti::CompareResult::Equals : rtti::CompareResult::NotEquals;
+}
 } // namespace
 
 namespace rtti
@@ -59,13 +74,14 @@ public:
     {
         type_of<T>()->m_typeConvertors.push_back({.TargetType = type_of<U>(), .Convert = [](const ObjectPtr& obj, Type* targetType, ObjectPtr& target) -> bool
                                                   {
+                                                      using TU = typename rtti::TypeWarper<U>::type;
                                                       if constexpr (is_object<T>)
                                                       {
                                                           std::shared_ptr<T> tobj = cast<std::shared_ptr<T>>(obj);
-                                                          if constexpr (is_object<U>)
+                                                          if constexpr (is_object<TU>)
                                                           {
-                                                              std::shared_ptr<U> uobj = nullptr;
-                                                              if (tobj->template ConvertTo<std::shared_ptr<U>>(uobj))
+                                                              std::shared_ptr<TU> uobj = nullptr;
+                                                              if (tobj->template ConvertTo<std::shared_ptr<TU>>(uobj))
                                                               {
                                                                   target = uobj;
                                                                   return true;
@@ -73,8 +89,8 @@ public:
                                                           }
                                                           else
                                                           {
-                                                              U uobj;
-                                                              if (tobj->template ConvertTo<U>(uobj))
+                                                              TU uobj;
+                                                              if (tobj->template ConvertTo<TU>(uobj))
                                                               {
                                                                   target = rtti::Box(uobj);
                                                                   return true;
@@ -83,19 +99,26 @@ public:
                                                       }
                                                       else
                                                       {
-                                                          if constexpr (is_object<U>)
+                                                          if constexpr (is_object<TU>)
                                                           {
-                                                              target = static_cast<std::shared_ptr<U>>(rtti::Unbox<T>(obj));
+                                                              target = static_cast<std::shared_ptr<TU>>(rtti::Unbox<T>(obj));
                                                               return true;
                                                           }
                                                           else
                                                           {
-                                                              target = rtti::Box(static_cast<U>(rtti::Unbox<T>(obj)));
+                                                              target = rtti::Box(static_cast<TU>(rtti::Unbox<T>(obj)));
                                                               return true;
                                                           }
                                                       }
                                                       return false;
                                                   }});
+        return *this;
+    }
+
+    template <typename U>
+    TypeRegister<T>& compare()
+    {
+        type_of<T>()->m_objectComparers.push_back({.TargetType = type_of<U>(), .Compare = &comparer<T, U>});
         return *this;
     }
 
@@ -196,6 +219,13 @@ public:
         type_of<T>()->m_enumValues.push_back({.number = (int64_t)v, .value = Box(v), .name = name});
         return *this;
     }
+
+    template <typename U>
+    TypeRegister<T>& compare()
+    {
+        type_of<T>()->m_objectComparers.push_back({.TargetType = type_of<U>(), .Compare = &comparer<T, U>});
+        return *this;
+    }
 };
 
 template <typename T>
@@ -214,6 +244,8 @@ inline Type* DefaultEnumRegister(Type* type)
     type->m_constructors.push_back(ConstructorInfo::Register(type, &ctor<T, uint32_t>));
     type->m_constructors.push_back(ConstructorInfo::Register(type, &ctor<T, int64_t>));
     type->m_constructors.push_back(ConstructorInfo::Register(type, &ctor<T, uint64_t>));
+    type->m_constructors.push_back(ConstructorInfo::Register(type, &ctor<T, long>));
+    type->m_constructors.push_back(ConstructorInfo::Register(type, &ctor<T, unsigned long>));
 
     type->m_typeConvertors.push_back({.TargetType = type_of<int8_t>(), .Convert = [](const ObjectPtr& obj, Type* targetType, ObjectPtr& target) -> bool
                                       {
@@ -255,6 +287,27 @@ inline Type* DefaultEnumRegister(Type* type)
                                           target = rtti::Box(static_cast<uint64_t>(rtti::Unbox<T>(obj)));
                                           return true;
                                       }});
+    type->m_typeConvertors.push_back({.TargetType = type_of<long>(), .Convert = [](const ObjectPtr& obj, Type* targetType, ObjectPtr& target) -> bool
+                                      {
+                                          target = rtti::Box(static_cast<long>(rtti::Unbox<T>(obj)));
+                                          return true;
+                                      }});
+    type->m_typeConvertors.push_back({.TargetType = type_of<unsigned long>(), .Convert = [](const ObjectPtr& obj, Type* targetType, ObjectPtr& target) -> bool
+                                      {
+                                          target = rtti::Box(static_cast<unsigned long>(rtti::Unbox<T>(obj)));
+                                          return true;
+                                      }});
+
+    type->m_objectComparers.push_back({.TargetType = type_of<int8_t>(), .Compare = &comparer<typename std::underlying_type<T>::type, int8_t>});
+    type->m_objectComparers.push_back({.TargetType = type_of<uint8_t>(), .Compare = &comparer<typename std::underlying_type<T>::type, uint8_t>});
+    type->m_objectComparers.push_back({.TargetType = type_of<int16_t>(), .Compare = &comparer<typename std::underlying_type<T>::type, int16_t>});
+    type->m_objectComparers.push_back({.TargetType = type_of<uint16_t>(), .Compare = &comparer<typename std::underlying_type<T>::type, uint16_t>});
+    type->m_objectComparers.push_back({.TargetType = type_of<int32_t>(), .Compare = &comparer<typename std::underlying_type<T>::type, int32_t>});
+    type->m_objectComparers.push_back({.TargetType = type_of<uint32_t>(), .Compare = &comparer<typename std::underlying_type<T>::type, uint32_t>});
+    type->m_objectComparers.push_back({.TargetType = type_of<int64_t>(), .Compare = &comparer<typename std::underlying_type<T>::type, int64_t>});
+    type->m_objectComparers.push_back({.TargetType = type_of<uint64_t>(), .Compare = &comparer<typename std::underlying_type<T>::type, uint64_t>});
+    type->m_objectComparers.push_back({.TargetType = type_of<long>(), .Compare = &comparer<typename std::underlying_type<T>::type, long>});
+    type->m_objectComparers.push_back({.TargetType = type_of<unsigned long>(), .Compare = &comparer<typename std::underlying_type<T>::type, unsigned long>});
 
     return type;
 }

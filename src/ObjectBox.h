@@ -30,6 +30,14 @@ public:
         return ClassType();
     }
 
+    size_t GetHashCode() const override
+    {
+        if constexpr (std::is_default_constructible<std::hash<T>>::value)
+            return std::hash<T>()(object);
+        else
+            return Object::GetHashCode();
+    }
+
 private:
     T object;
 
@@ -78,10 +86,18 @@ inline std::enable_if_t<!is_object<typename TypeWarper<remove_cr<T>>::type>, T> 
     {
         if (objbox->IsPointer())
         {
-            // Unbox<int*>(int*)
-            assert(ptr->GetRttiType() == type_of<T>());
-            auto boxed = static_cast<Boxed<T>*>(objbox);
-            return boxed->Unbox();
+            if constexpr (std::is_same_v<T, void*>)
+            {
+                // Unbox<void*>(int*)
+                return objbox->GetPointer();
+            }
+            else
+            {
+                // Unbox<int*>(int*)
+                assert(ptr->GetRttiType() == type_of<T>());
+                auto boxed = static_cast<Boxed<T>*>(objbox);
+                return boxed->Unbox();
+            }
         }
         else
         {

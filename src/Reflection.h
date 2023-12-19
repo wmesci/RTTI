@@ -70,33 +70,48 @@ struct ParameterInfo
     bool IsConst;
 };
 
-extern Type* NewType(const std::string& name, size_t size, Type* base);
+enum class TypeFlags
+{
+    None = 0,
+    Enum = 1,
+    Pointer = 2
+};
+
+extern Type* NewType(const std::string& name, size_t size, TypeFlags flags, Type* underlyingType, Type* base);
 
 template <typename T>
 rtti::Type* DefaultEnumRegister(rtti::Type* type);
 
 template <typename CLS>
-constexpr std::string_view GetTypeName()
+inline std::string GetTypeName()
 {
     if constexpr (std::is_pointer_v<CLS>)
-        return "[ptr]";
+        return std::string(NAMEOF_SHORT_TYPE(std::remove_pointer_t<CLS>)) + "*";
     else
-        return NAMEOF_SHORT_TYPE(CLS);
+        return std::string(NAMEOF_SHORT_TYPE(CLS));
 }
 
 template <typename CLS>
 Type* CreateType()
 {
-    static_assert(std::is_same_v<Object, CLS> || (!std::is_base_of_v<Object, CLS> && !std::is_pointer_v<CLS>));
-    static Type* type = NewType(std::string(GetTypeName<CLS>()), sizeof(CLS), nullptr);
+    static_assert(std::is_same_v<Object, CLS>);
+    static Type* type = NewType(GetTypeName<CLS>(), sizeof(CLS), TypeFlags::None, nullptr, nullptr);
     return type;
 }
 
 template <typename CLS, typename BASE>
-std::enable_if_t<!std::is_enum_v<CLS>, Type*> CreateType()
+std::enable_if_t<!std::is_enum_v<CLS> && !std::is_pointer_v<CLS>, Type*> CreateType()
 {
     static_assert(std::is_base_of_v<BASE, CLS> || std::is_same_v<BASE, ObjectBox>);
-    static Type* type = NewType(std::string(GetTypeName<CLS>()), sizeof(CLS), type_of<BASE>());
+    static Type* type = NewType(GetTypeName<CLS>(), sizeof(CLS), TypeFlags::None, nullptr, type_of<BASE>());
+    return type;
+}
+
+template <typename CLS, typename BASE>
+std::enable_if_t<std::is_pointer_v<CLS>, Type*> CreateType()
+{
+    static_assert(std::is_base_of_v<BASE, CLS> || std::is_same_v<BASE, ObjectBox>);
+    static Type* type = NewType(GetTypeName<CLS>(), sizeof(CLS), TypeFlags::Pointer, type_of<typename std::remove_pointer_t<CLS>>(), type_of<BASE>());
     return type;
 }
 
@@ -104,7 +119,7 @@ template <typename CLS, typename BASE>
 std::enable_if_t<std::is_enum_v<CLS>, Type*> CreateType()
 {
     static_assert(std::is_base_of_v<BASE, CLS> || std::is_same_v<BASE, ObjectBox>);
-    static Type* type = DefaultEnumRegister<CLS>(NewType(std::string(GetTypeName<CLS>()), sizeof(CLS), type_of<BASE>()));
+    static Type* type = DefaultEnumRegister<CLS>(NewType(std::string(GetTypeName<CLS>()), sizeof(CLS), TypeFlags::Enum, type_of<typename std::underlying_type_t<CLS>>(), type_of<BASE>()));
     return type;
 }
 

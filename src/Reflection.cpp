@@ -3,7 +3,7 @@
 
 using namespace rtti;
 
-Type* rtti::NewType(const std::string& name, size_t size, Type* base)
+Type* rtti::NewType(const std::string& name, size_t size, TypeFlags flags, Type* underlyingType, Type* base)
 {
-    return new Type(name, size, base, {});
+    return new Type(name, size, flags, underlyingType, base, {});
 }

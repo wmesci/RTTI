@@ -13,6 +13,8 @@ private:
 public:
     Object();
 
+    virtual size_t GetHashCode() const;
+
     virtual Type* GetRttiType() const;
 
     virtual ~Object();

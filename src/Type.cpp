@@ -6,10 +6,12 @@ using namespace rtti;
 
 Type* header = nullptr;
 
-Type::Type(const std::string& name, size_t size, Type* baseType, const std::map<size_t, std::any>& attributes)
+Type::Type(const std::string& name, size_t size, TypeFlags flags, Type* underlyingType, Type* baseType, const std::map<size_t, std::any>& attributes)
     : Attributable(attributes)
     , m_name(name)
-    , m_size(size)
+    , m_size((uint32_t)size)
+    , m_flags(flags)
+    , m_underlyingType(underlyingType)
     , m_baseType(baseType)
     , next(header)
 {
@@ -33,14 +35,19 @@ bool Type::IsSubClassOf(Type* type) const
     return false;
 }
 
-bool Type::IsBoxedType() const
+bool Type::IsValueType() const
 {
     return GetBaseType() == type_of<ObjectBox>();
 }
 
 bool Type::IsEnum() const
 {
-    return m_underlyingType != nullptr;
+    return ((int)m_flags & (int)TypeFlags::Enum) != 0;
+}
+
+bool Type::IsPointer() const
+{
+    return ((int)m_flags & (int)TypeFlags::Pointer) != 0;
 }
 
 const std::vector<EnumInfo>& Type::GetEnumInfos() const
@@ -74,11 +81,6 @@ bool Type::GetEnumInfo(const int64_t& number, EnumInfo* pInfo) const
     return false;
 }
 
-Type* Type::GetEnumUnderlyingType() const
-{
-    return m_underlyingType;
-}
-
 bool Type::IsAssignableTo(Type* type) const
 {
     if (type == nullptr)
@@ -87,7 +89,7 @@ bool Type::IsAssignableTo(Type* type) const
     if (this == type)
         return true;
 
-    if (IsBoxedType())
+    if (IsValueType())
         return type == type_of<Object>();
     else
         return this->IsSubClassOf(type);
@@ -104,7 +106,7 @@ bool Type::IsAssignableFrom(Type* type) const
 bool Type::IsAssignableFrom(const ObjectPtr& obj) const
 {
     if (obj == nullptr)
-        return !IsBoxedType();
+        return !IsValueType();
 
     return IsAssignableFrom(obj->GetRttiType());
 }
@@ -114,6 +116,9 @@ bool Type::CanConvertTo(Type* targetType) const
     Type* sourceType = const_cast<Type*>(this);
 
     if (targetType->IsAssignableFrom(sourceType))
+        return true;
+
+    if (this->IsPointer() && targetType == type_of<void*>())
         return true;
 
     for (auto&& i : targetType->m_constructors)
@@ -135,7 +140,7 @@ bool Type::Convert(const ObjectPtr& obj, Type* targetType, ObjectPtr& target)
 {
     if (obj == nullptr)
     {
-        if (!targetType->IsBoxedType())
+        if (!targetType->IsValueType())
         {
             target = nullptr;
             return true;
@@ -148,6 +153,12 @@ bool Type::Convert(const ObjectPtr& obj, Type* targetType, ObjectPtr& target)
     if (targetType->IsAssignableFrom(sourceType))
     {
         target = obj;
+        return true;
+    }
+
+    if (sourceType->IsPointer() && targetType == type_of<void*>())
+    {
+        target = rtti::Box(rtti::Unbox<void*>(obj));
         return true;
     }
 
@@ -172,6 +183,72 @@ bool Type::Convert(const ObjectPtr& obj, Type* targetType, ObjectPtr& target)
     return false;
 }
 
+bool Type::IsComparable(Type* leftType, Type* rightType)
+{
+    if (leftType == nullptr)
+    {
+        if (rightType == nullptr)
+            return true;
+        else
+            return Type::IsComparable(rightType, leftType);
+    }
+
+    for (auto&& i : leftType->m_objectComparers)
+    {
+        if ((i.TargetType == nullptr && rightType == nullptr) || (i.TargetType != nullptr && rightType != nullptr && rightType->IsAssignableTo(i.TargetType)))
+        {
+            return true;
+        }
+    }
+
+    if (rightType != nullptr)
+    {
+        for (auto&& i : rightType->m_objectComparers)
+        {
+            if (i.TargetType != nullptr && leftType->IsAssignableTo(i.TargetType))
+            {
+                return true;
+            }
+        }
+    }
+
+    return false;
+}
+
+CompareResult Type::Compare(const ObjectPtr& left, const ObjectPtr& right)
+{
+    if (left == nullptr)
+    {
+        if (right == nullptr)
+            return CompareResult::Equals;
+        else
+            return Type::Compare(right, left);
+    }
+
+    Type* leftType = left->GetRttiType();
+    Type* rightType = right != nullptr ? right->GetRttiType() : nullptr;
+    for (auto&& i : leftType->m_objectComparers)
+    {
+        if ((i.TargetType == nullptr && rightType == nullptr) || (i.TargetType != nullptr && rightType != nullptr && rightType->IsAssignableTo(i.TargetType)))
+        {
+            return i.Compare(left, right);
+        }
+    }
+
+    if (right != nullptr)
+    {
+        for (auto&& i : rightType->m_objectComparers)
+        {
+            if (i.TargetType != nullptr && leftType->IsAssignableTo(i.TargetType))
+            {
+                return i.Compare(right, left);
+            }
+        }
+    }
+
+    return CompareResult::Failed;
+}
+
 ObjectPtr Type::CreateInstance(const std::vector<ObjectPtr>& args) const
 {
     for (int i = 0; i < m_constructors.size(); i++)
@@ -183,7 +260,7 @@ ObjectPtr Type::CreateInstance(const std::vector<ObjectPtr>& args) const
             for (int j = 0; j < args.size(); j++)
             {
                 auto pt = ctor->GetParameters()[j];
-                if (pt.Type->IsBoxedType())
+                if (pt.Type->IsValueType())
                 {
                     if (args[j] == nullptr || args[j]->GetRttiType() != pt.Type)
                     {

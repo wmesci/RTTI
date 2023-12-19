@@ -18,6 +18,11 @@ Type* Object::GetRttiType() const
     return Object::ClassType();
 }
 
+size_t Object::GetHashCode() const
+{
+    return std::hash<const void*>()(this);
+}
+
 Object::~Object()
 {
 }

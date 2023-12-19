@@ -32,5 +32,19 @@ public:
 
         return std::any();
     }
+
+    template <typename T>
+    T GetAttribute(size_t id, T defaultValue = {}) const
+    {
+        auto v = GetAttribute(id);
+        T* pV = std::any_cast<T>(&v);
+        if (pV != nullptr)
+            return *pV;
+
+        return defaultValue;
+    }
+
+    template <>
+    std::nullptr_t GetAttribute(size_t id, std::nullptr_t defaultValue) const = delete;
 };
 } // namespace rtti
