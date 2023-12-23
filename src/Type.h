@@ -220,6 +220,7 @@ inline auto cast(const From& from, bool* pOK)
             // (S/W)Ptr<A> --> (S/W)Ptr<B>
             // From -> (S/W)Ptr<A>,     TFrom -> A
             // To   -> (S/W)Ptr<B> / B, TTo   -> B
+            // RET  -> Ptr<TTo>
 
             if constexpr (std::is_same_v<std::weak_ptr<TFrom>, From>)
             {
@@ -227,9 +228,10 @@ inline auto cast(const From& from, bool* pOK)
             }
             else
             {
-                if constexpr (std::is_convertible_v<From, remove_cr<To>>)
+                if constexpr (std::is_convertible_v<TFrom, TTo>)
                 {
-                    return To(from);
+                    // Ptr<Subclass> -- > Ptr<Base>
+                    return std::shared_ptr<TTo>(from);
                 }
 
                 if (from != nullptr)
