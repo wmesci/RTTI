@@ -170,16 +170,26 @@ public:
                     return nullptr;
                 }
 
-                if (!type_of<Host>()->IsAssignableFrom(target))
-                {
-                    RTTI_ERROR((std::string("target must be ") + type_of<Host>()->GetName() + std::string(", but is actually ") + target->GetRttiType()->GetName()).c_str());
-                    return nullptr;
-                }
+                Type* target_type = target->GetRttiType();
 
-                if constexpr (is_object<Host>)
+                if constexpr (is_object<SelfType>)
+                {
+                    if (!type_of<SelfType>()->IsAssignableFrom(target))
+                    {
+                        RTTI_ERROR((std::string("target must be ") + type_of<SelfType>()->GetName() + std::string(", but is actually ") + target_type->GetName()).c_str());
+                        return nullptr;
+                    }
                     self = static_cast<SelfType*>(target.get());
+                }
                 else
+                {
+                    if (type_of<SelfType>() != target_type && type_of<SelfType*>() != target_type)
+                    {
+                        RTTI_ERROR((std::string("target must be ") + type_of<SelfType>()->GetName() + std::string(", but is actually ") + target_type->GetName()).c_str());
+                        return nullptr;
+                    }
                     self = Unbox<SelfType*>(target);
+                }
             }
 
             auto args_tuple = MakeArgs<Args...>(args);

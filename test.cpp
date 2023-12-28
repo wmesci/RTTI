@@ -20,11 +20,17 @@ enum class TestEnum2
 
 struct TestStruct
 {
-    TestEnum TE = TestEnum::Value2;
+    TestEnum TE = TestEnum::Value1;
 
     operator int() const
     {
         return 250;
+    }
+
+    void Func(int a)
+    {
+        printf("TestStruct::Func %d - %d\n", a, TE);
+        TE = (TestEnum)a;
     }
 };
 
@@ -254,7 +260,8 @@ void RegisterTypes()
 
     TypeRegister<TestStruct>::New("TestStruct"s)
         .convert<int>()
-        .property("TE"s, &TestStruct::TE);
+        .property("TE"s, &TestStruct::TE)
+        .method("Func"s, &TestStruct::Func);
 
     TypeRegister<TestBase>::New("TestBase"s)
         .property("TestBaseA"s, &TestBase::TestBaseA)
@@ -414,6 +421,12 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char* argv[])
     type->GetMethod("Func6"s, {type_of<std::shared_ptr<int>>()})->Invoke(obj, {Box(std::make_shared<int>(135))});
     type->GetMethod("Func7"s, {type_of<TestBase>()})->Invoke(obj, {obj});
     type->GetMethod("Func8"s, {type_of<TestEnum>()})->Invoke(obj, {Box(123)});
+
+    TestStruct testStruct;
+    type_of<TestStruct>()->GetMethod("Func"s)->Invoke(Box(testStruct), {Box(3)});
+    type_of<TestStruct>()->GetMethod("Func"s)->Invoke(Box(&testStruct), {Box(4)});
+
+    assert(testStruct.TE == (TestEnum)4);
 
     printf("\n");
 
