@@ -343,6 +343,9 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char* argv[])
     auto obj1 = type->Create<Test>(123);
     auto obj2 = type->Create<Test>(123, 789.12f);
 
+    assert(rtti::cast<Test>((TestBase*)obj.get()) == obj.get());
+    assert(rtti::cast<Test*>((TestBase*)obj.get()) == obj.get());
+
     ObjectPtr ttt;
     Type::Convert(obj, type_of<int>(), ttt);
 

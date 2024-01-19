@@ -192,85 +192,137 @@ inline CompareResult compare(const TL& left, const TR& right)
 }
 
 // 将当前类型转换成指定类型
-// 直接转换：
-//   Ptr<Subclass>  -->  Ptr<Base>
-//   Subclass*      -->  Base*
-//   int            -->  float
-// Unbox：
-//   ObjectPtr --> ValueType / ValueType*
-// Box：
-//   ValueType --> ObjectPtr
+// For Object (F --> T):
+//    To   |    T     |     T*   |  SPtr<T>  |  WPtr<T>  |
+// --------+----------+----------+-----------+-----------+
+// SPtr<F> | SPtr<T>+ |     /    |  SPtr<T>+ |  WPtr<T>  |
+// WPtr<F> | SPtr<F>  |     /    |  SPtr<T>+ |  WPtr<T>  |
+//    F*   |    T*    |     T*   |     /     |     /     |
+//
+// For ValueType (T/T* --> T/T*, Object --> T / T*, T / T* --> Object):
+//    To        |       T     |      T*     |  Ptr<Object> | WPtr<Object> |
+// -------------+-------------+-------------+--------------+--------------+
+// Ptr<Object>  |    Unbox    |    Unbox    |       -      |       -      |
+// WPtr<Object> |    Unbox    |    Unbox    |       -      |       -      |
+//       F      |     (T)F    |    (T)F     |      Box     |       /      |
+//       F*     |     (T)F    |    (T)F     |      Box     |       /      |
+
 template <class To, class From>
 inline auto cast(const From& from, bool* pOK)
 {
-    using TFrom = typename TypeWarper<remove_cr<From>>::type;
-    using TTo = typename TypeWarper<remove_cr<To>>::type;
+    using TFrom = std::remove_pointer_t<typename TypeWarper<remove_cr<From>>::type>;
+    using TTo = std::remove_pointer_t<typename TypeWarper<remove_cr<To>>::type>;
 
     static_assert(!std::is_pointer_v<TFrom> || !is_object<std::remove_pointer_t<TFrom>>);
     static_assert(!std::is_pointer_v<TTo> || !is_object<std::remove_pointer_t<TTo>>);
 
-    if (pOK != nullptr)
-        *pOK = true;
+#define RETURN(v, ok)       \
+    {                       \
+        if (pOK != nullptr) \
+            *pOK = ok;      \
+        return v;           \
+    }
 
     if constexpr (is_object<TFrom>)
     {
-        static_assert(std::is_same_v<std::shared_ptr<TFrom>, From> || std::is_same_v<std::weak_ptr<TFrom>, From>);
+        static_assert(std::is_same_v<TFrom*, From> || std::is_same_v<std::shared_ptr<TFrom>, From> || std::is_same_v<std::weak_ptr<TFrom>, From>);
         if constexpr (is_object<TTo>)
         {
-            // (S/W)Ptr<A> --> (S/W)Ptr<B>
-            // From -> (S/W)Ptr<A>,     TFrom -> A
-            // To   -> (S/W)Ptr<B> / B, TTo   -> B
-            // RET  -> Ptr<TTo>
+            static_assert(std::is_same_v<TTo, To> || std::is_same_v<TTo*, To> || std::is_same_v<std::shared_ptr<TTo>, To> || std::is_same_v<std::weak_ptr<TTo>, To>);
 
-            if constexpr (std::is_same_v<std::weak_ptr<TFrom>, From>)
+            // if constexpr (std::is_same_v<TFrom, TTo> || std::is_convertible_v<TFrom, TTo>)
+            //{
+            //     if constexpr (std::is_same_v<TFrom*, From>)
+            //     {
+            //         // Subclass* --> Base / Base*
+            //         static_assert(std::is_same_v<TTo, To> || std::is_same_v<TTo*, To>);
+            //         RETURN((TTo*)from, true)
+            //     }
+            //     else
+            //     {
+            //        static_assert(!std::is_same_v<TTo*, To>);
+            //
+            //        if constexpr (std::is_same_v<std::weak_ptr<TFrom>, From>)
+            //        {
+            //            if constexpr (std::is_same_v<TTo, To> || std::is_same_v<std::shared_ptr<TTo>, To>) // WPtr<Subclass> --> Base / SPtr<Base>
+            //                RETURN(To(from.lock()), true)
+            //            else if constexpr (std::is_same_v<std::weak_ptr<TTo>, To>) // WPtr<Subclass> --> WPtr<Base>
+            //                RETURN(To(from), true)
+            //        }
+            //        else if constexpr (std::is_same_v<std::shared_ptr<TFrom>, From>)
+            //        {
+            //            if constexpr (std::is_same_v<TTo, To> || std::is_same_v<std::shared_ptr<TTo>, To>) // SPtr<Subclass> --> Base / SPtr<Base>
+            //                RETURN(To(from), true)
+            //            else if constexpr (std::is_same_v<std::weak_ptr<TTo>, To>) // SPtr<Subclass> --> WPtr<Base>
+            //                RETURN(To(from), true)
+            //        }
+            //    }
+            //}
+            // else
             {
-                return cast<To>(from.lock(), pOK);
-            }
-            else
-            {
-                if constexpr (std::is_convertible_v<TFrom, TTo>)
+                bool convertible = std::is_same_v<TFrom, TTo> || std::is_convertible_v<TFrom, TTo> || from == nullptr || from->GetRttiType()->template IsAssignableTo<TTo>();
+
+                if constexpr (std::is_same_v<TFrom*, From>)
                 {
-                    // Ptr<Subclass> -- > Ptr<Base>
-                    return std::shared_ptr<TTo>(from);
+                    // Base* --> Subclass / Subclass*
+                    static_assert(std::is_same_v<TTo, To> || std::is_same_v<TTo*, To>);
+                    if (convertible)
+                        RETURN((TTo*)from, true)
+                    else
+                        RETURN((TTo*)nullptr, false)
                 }
-
-                if (from != nullptr)
+                else
                 {
-                    ObjectPtr target = nullptr;
-                    if (Type::Convert(from, type_of<TTo>(), target))
-                        return std::static_pointer_cast<TTo>(target);
+                    static_assert(!std::is_same_v<TTo*, To>);
+
+                    if constexpr (std::is_same_v<std::weak_ptr<TFrom>, From>)
+                    {
+                        // WPtr<Base> --> Subclass / SPtr<Subclass> / WPtr<Subclass>
+                        auto obj = cast<std::shared_ptr<TTo>>(from.lock(), pOK);
+                        if constexpr (std::is_same_v<std::weak_ptr<TTo>, To>)
+                            RETURN(std::weak_ptr<TTo>(obj), true)
+                        else
+                            RETURN(obj, true)
+                    }
+                    else if constexpr (std::is_same_v<std::shared_ptr<TFrom>, From>)
+                    {
+                        if (from != nullptr)
+                        {
+                            ObjectPtr target = nullptr;
+                            if (Type::Convert(from, type_of<TTo>(), target))
+                                RETURN(std::static_pointer_cast<TTo>(target), true)
+                            else
+                                RETURN(std::shared_ptr<TTo>(nullptr), false)
+                        }
+                        else
+                        {
+                            RETURN(std::shared_ptr<TTo>(nullptr), true)
+                        }
+                    }
                 }
-
-                if (pOK != nullptr)
-                    *pOK = false;
-
-                return std::shared_ptr<TTo>(nullptr);
             }
         }
         else
         {
-            // ObjectPtr -> ValueType / ValueType* / SPtr<ValueType>
+            // ObjectPtr -> ValueType / ValueType*
             static_assert(std::is_same_v<From, ObjectPtr>);
             static_assert(std::is_same_v<TTo, remove_cr<To>> || std::is_same_v<TTo, remove_cr<To>*>);
 
             if (from != nullptr)
             {
                 if (from->GetRttiType() == type_of<TTo>() || from->GetRttiType() == type_of<std::remove_pointer_t<TTo>>())
-                    return Unbox<TTo>(from);
+                    RETURN(Unbox<TTo>(from), true);
 
                 if (from->GetRttiType()->IsPointer() && std::is_same_v<TTo, void*>)
-                    return Unbox<TTo>(from);
+                    RETURN(Unbox<TTo>(from), true);
 
                 ObjectPtr target = nullptr;
                 if (Type::Convert(from, type_of<TTo>(), target))
-                    return Unbox<TTo>(target);
+                    RETURN(Unbox<TTo>(target), true);
             }
 
-            if (pOK != nullptr)
-                *pOK = false;
-
             RTTI_ERROR((std::string("conversion of ") + (from == nullptr ? std::string("nullptr") : from->GetRttiType()->GetName()) + std::string(" to ") + type_of<TTo>()->GetName() + std::string(" is not allowed ")).c_str());
-            return TTo();
+            RETURN(TTo(), false)
         }
     }
     else
@@ -284,30 +336,26 @@ inline auto cast(const From& from, bool* pOK)
 
             ObjectPtr target = nullptr;
             if (Type::Convert(Box(from), type_of<TTo>(), target))
-                return std::static_pointer_cast<TTo>(target);
+                RETURN(std::static_pointer_cast<TTo>(target), true)
 
-            if (pOK != nullptr)
-                *pOK = false;
-
-            return std::shared_ptr<TTo>(nullptr);
+            RETURN(std::shared_ptr<TTo>(nullptr), false)
         }
         else
         {
             // ValueType -> ValueType
 
             if constexpr (std::is_convertible_v<From, remove_cr<To>>)
-                return TTo(from);
+                RETURN(TTo(from), true)
 
             ObjectPtr target = nullptr;
             if (Type::Convert(Box(from), type_of<TTo>(), target))
-                return Unbox<TTo>(target);
-
-            if (pOK != nullptr)
-                *pOK = false;
+                RETURN(Unbox<TTo>(target), true)
 
             RTTI_ERROR((std::string("conversion of ") + type_of<TFrom>()->GetName() + std::string(" to ") + type_of<TTo>()->GetName() + std::string(" is not allowed ")).c_str());
-            return TTo();
+            RETURN(TTo(), false)
         }
     }
-}
+
+#undef RETURN
+} // namespace rtti
 } // namespace rtti
