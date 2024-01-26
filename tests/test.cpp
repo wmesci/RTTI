@@ -1,6 +1,6 @@
 #include <cassert>
 #define RTTI_ENABLE_LOG 1
-#include "src/RTTI.h"
+#include <RTTI.h>
 
 using namespace std::string_literals;
 
