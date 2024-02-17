@@ -237,10 +237,10 @@ void print(MethodBase* m)
         if (p.IsConst)
             printf("const ");
 
-        if (p.Type->IsValueType())
-            printf("%s", p.Type->GetName().c_str());
+        if (p.ParameterType->IsValueType())
+            printf("%s", p.ParameterType->GetName().c_str());
         else
-            printf("std::shared_ptr<%s>", p.Type->GetName().c_str());
+            printf("std::shared_ptr<%s>", p.ParameterType->GetName().c_str());
 
         if (p.IsRef)
             printf("&");

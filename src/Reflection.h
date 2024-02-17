@@ -65,7 +65,7 @@ struct EnumInfo
 
 struct ParameterInfo
 {
-    Type* Type;
+    Type* ParameterType;
     bool IsRef;
     bool IsConst;
 };

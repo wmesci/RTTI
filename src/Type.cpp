@@ -123,7 +123,7 @@ bool Type::CanConvertTo(Type* targetType) const
 
     for (auto&& i : targetType->m_constructors)
     {
-        if (i->GetParameters().size() == 1 && i->GetParameters()[0].Type->IsAssignableFrom(sourceType))
+        if (i->GetParameters().size() == 1 && i->GetParameters()[0].ParameterType->IsAssignableFrom(sourceType))
             return true;
     }
 
@@ -164,7 +164,7 @@ bool Type::Convert(const ObjectPtr& obj, Type* targetType, ObjectPtr& target)
 
     for (auto&& i : targetType->m_constructors)
     {
-        if (i->GetParameters().size() == 1 && i->GetParameters()[0].Type->IsAssignableFrom(sourceType))
+        if (i->GetParameters().size() == 1 && i->GetParameters()[0].ParameterType->IsAssignableFrom(sourceType))
         {
             target = targetType->CreateInstance({obj});
             if (target != nullptr)
@@ -260,9 +260,9 @@ ObjectPtr Type::CreateInstance(const std::vector<ObjectPtr>& args) const
             for (size_t j = 0; j < args.size(); j++)
             {
                 auto pt = ctor->GetParameters()[j];
-                if (pt.Type->IsValueType())
+                if (pt.ParameterType->IsValueType())
                 {
-                    if (args[j] == nullptr || args[j]->GetRttiType() != pt.Type)
+                    if (args[j] == nullptr || args[j]->GetRttiType() != pt.ParameterType)
                     {
                         ok = false;
                         break;
@@ -270,7 +270,7 @@ ObjectPtr Type::CreateInstance(const std::vector<ObjectPtr>& args) const
                 }
                 else
                 {
-                    if (args[j] != nullptr && !args[j]->GetRttiType()->CanConvertTo(pt.Type))
+                    if (args[j] != nullptr && !args[j]->GetRttiType()->CanConvertTo(pt.ParameterType))
                     {
                         ok = false;
                         break;
@@ -315,7 +315,7 @@ ConstructorInfo* Type::GetConstructor(std::initializer_list<Type*> args) const
             for (size_t i = 0; i < ctor->GetParameters().size(); i++)
             {
                 auto p = ctor->GetParameters()[i];
-                if (p.Type != args.begin()[i])
+                if (p.ParameterType != args.begin()[i])
                 {
                     paramMatch = false;
                     break;
@@ -340,7 +340,7 @@ ConstructorInfo* Type::GetConstructor(std::initializer_list<ParameterInfo> args)
             {
                 const auto& p = ctor->GetParameters()[i];
                 const auto& ap = args.begin()[i];
-                if (p.Type != ap.Type || p.IsConst != ap.IsConst || p.IsRef != ap.IsRef)
+                if (p.ParameterType != ap.ParameterType || p.IsConst != ap.IsConst || p.IsRef != ap.IsRef)
                 {
                     paramMatch = false;
                     break;
@@ -397,7 +397,7 @@ MethodInfo* Type::GetMethod(const std::string& name, std::initializer_list<Type*
                 for (size_t i = 0; i < m->GetParameters().size(); i++)
                 {
                     auto p = m->GetParameters()[i];
-                    if (p.Type != args.begin()[i])
+                    if (p.ParameterType != args.begin()[i])
                     {
                         paramMatch = false;
                         break;
@@ -428,7 +428,7 @@ MethodInfo* Type::GetMethod(const std::string& name, std::initializer_list<Param
                 {
                     const auto& p = m->GetParameters()[i];
                     const auto& ap = args.begin()[i];
-                    if (p.Type != ap.Type || p.IsConst != ap.IsConst || p.IsRef != ap.IsRef)
+                    if (p.ParameterType != ap.ParameterType || p.IsConst != ap.IsConst || p.IsRef != ap.IsRef)
                     {
                         paramMatch = false;
                         break;

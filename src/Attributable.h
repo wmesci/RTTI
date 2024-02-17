@@ -43,8 +43,8 @@ public:
 
         return defaultValue;
     }
-
-    template <>
-    std::nullptr_t GetAttribute(size_t id, std::nullptr_t defaultValue) const = delete;
 };
+
+template <>
+std::nullptr_t Attributable::GetAttribute(size_t id, std::nullptr_t defaultValue) const = delete;
 } // namespace rtti
