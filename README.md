@@ -1,3 +1,5 @@
+[![CMake on multiple platforms](https://github.com/wmesci/RTTI/actions/workflows/cmake-multi-platform.yml/badge.svg)](https://github.com/wmesci/RTTI/actions/workflows/cmake-multi-platform.yml)
+
 RTTI 库是参考了 C# 语言里的反射而实现的一套 C++ 运行时反射库
 
 在 RTTI 库里，对象分为两类：
