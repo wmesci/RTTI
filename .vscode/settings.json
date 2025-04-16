@@ -7,8 +7,6 @@
     "C_Cpp.default.includePath": [
     ],
     "C_Cpp.default.defines": [
-        "WIN",
-        "x64"
     ],
     "editor.defaultFormatter": "xaver.clang-format", 
     "editor.formatOnPaste": true, 
@@ -128,7 +126,9 @@
         "__bits": "cpp",
         "__verbose_abort": "cpp",
         "variant": "cpp",
-        "any": "cpp"
+        "any": "cpp",
+        "execution": "cpp",
+        "print": "cpp"
     },
     "cmake.configureOnOpen": true,
     //"cmake.configureArgs": [ "-T", "ClangCl" ],

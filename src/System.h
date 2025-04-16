@@ -1,8 +1,8 @@
 ﻿#pragma once
 #if defined(__clang__)
-    #define __debugbreak __builtin_debugtrap
+#define __debugbreak __builtin_debugtrap
 #elif defined(_MSC_VER)
-    #define __PRETTY_FUNCTION__ __FUNCSIG__
+#define __PRETTY_FUNCTION__ __FUNCSIG__
 #endif
 
 #include <type_traits>
@@ -72,6 +72,9 @@ constexpr bool is_object = std::is_base_of<Object, T>::value || std::is_same<Obj
 
 template <class T, class... Args>
 inline ObjectPtr ctor(Args... args);
+
+template <typename T>
+inline Type* type_of();
 
 template <class To, class From>
 inline auto cast(const From& from, bool* pOK = nullptr);

@@ -4,18 +4,13 @@
 
 using namespace rtti;
 
-Type* Object::ClassType()
-{
-    return CreateType<Object>();
-}
-
 Object::Object()
 {
 }
 
 Type* Object::GetRttiType() const
 {
-    return Object::ClassType();
+    return CreateType<Object>();
 }
 
 size_t Object::GetHashCode() const

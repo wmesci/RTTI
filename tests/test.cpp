@@ -36,7 +36,7 @@ struct TestStruct
 
 class TestBase : public Object
 {
-    TYPE_DECLARE(TestBase, Object)
+    TYPE_DECLARE(Object)
 public:
     TestBase() { printf("ctor()\n"); }
 
@@ -83,7 +83,7 @@ public:
 
 class Test : public TestBase
 {
-    TYPE_DECLARE(Test, TestBase)
+    TYPE_DECLARE(TestBase)
 public:
     Test() { printf("ctor()\n"); }
     Test(int i) { printf("ctor(%d)\n", i); }

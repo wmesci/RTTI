@@ -7,7 +7,7 @@ namespace rtti
 {
 class ObjectBox : public Object
 {
-    TYPE_DECLARE(ObjectBox, Object)
+    TYPE_DECLARE(Object)
 public:
     virtual bool IsPointer() const = 0;
 
@@ -21,13 +21,11 @@ class Boxed : public ObjectBox
     static_assert(!std::is_const<T>::value);
 
 public:
-    static rtti::Type* ClassType()
-    {
-        return rtti::CreateType<T, ObjectBox>();
-    }
+    using RTTI_BASE_CLASS = ObjectBox;
+
     virtual rtti::Type* GetRttiType() const override
     {
-        return ClassType();
+        return rtti::CreateType<T, ObjectBox>();
     }
 
     size_t GetHashCode() const override

@@ -11,7 +11,7 @@ RTTI 库是参考了 C# 语言里的反射而实现的一套 C++ 运行时反射
 ```cpp
 class MyClass : rtti::Object
 {
-TYPE_DECLARE(MyClass, rtti::Object) // 声明当前类名以及其基类
+TYPE_DECLARE(rtti::Object) // 声明其基类
 public:
     MyClass(int v);
  

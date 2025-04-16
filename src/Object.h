@@ -20,6 +20,6 @@ public:
     virtual ~Object();
 
 public:
-    static Type* ClassType();
+    using RTTI_BASE_CLASS = void;
 };
 } // namespace rtti
