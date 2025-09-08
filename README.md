@@ -1,122 +1,150 @@
-[![CMake on multiple platforms](https://github.com/wmesci/RTTI/actions/workflows/cmake-multi-platform.yml/badge.svg)](https://github.com/wmesci/RTTI/actions/workflows/cmake-multi-platform.yml)
+# RTTI
 
-RTTI 库是参考了 C# 语言里的反射而实现的一套 C++ 运行时反射库
+RTTI 是一个参考 C# 反射机制实现的 C++ 运行时类型信息和反射库，提供了类似 C# 的反射 API，使得 C++ 能够在运行时获取和操作类型信息。
 
-在 RTTI 库里，对象分为两类：
-* **引用类型**：以引用语义（指针、智能指针、Handle 等）的方式使用类型，声明变量、传递参数的时候以指针的方式进行，变量赋值后有两个变量指向同一个对象。在新 RTTI 库里，引用类型需要是 `rtti::Object` 类型的子类
-* **值类型**：以值语义的方式使用类型，变量赋值后变成了两个独立的实例。在新 RTTI 库里不限制其继承关系，但不允许以指针的方式使用
+## 特性
 
-## 注册类型
-对于引用类型
-```cpp
-class MyClass : rtti::Object
-{
-TYPE_DECLARE(rtti::Object) // 声明其基类
-public:
-    MyClass(int v);
- 
-    int IntField;
- 
-    int GetProp1() const;
-    void SetProp1(int v);
- 
-    int GetProp2() const;
- 
-    void Func(float v);
- 
-    bool ConvertTo(int& target);
-};
- 
-TypeRegister<MyClass>::New("MyClass")
-    .constructor<int>() // 构造函数，模版参数为构造函数的参数类型
-    .convert<int>() // 转换器，表示当前类型可以转换为 int，内部会使用 MyClass::ConvertTo 方法
-    .property("IntField", &MyClass::IntField, {{HASH("min_value"), 0}, {HASH("max_value"), 100}})
-    .property("Prop1", &MyClass::GetProp1, &Test::SetProp1)
-    .property("Prop2", &MyClass::GetProp2)
-    .method("Func", &MyClass::Func2);
+* 🚀 类似 C# 的反射 API
+* 💡 运行时类型信息查询
+* 🔄 类型转换和比较
+* 📦 属性和方法的反射
+* 🛠 构造函数的反射
+* 🔍 基类和继承关系查询
+* ⚡️ 头文件优先设计
+* 🎯 仅静态库，易于集成
+
+## 要求
+
+* C++17 或更高版本
+* CMake 3.14 或更高版本
+
+## 安装与集成
+
+### 通过 CMake FetchContent（推荐）
+```cmake
+include(FetchContent)
+FetchContent_Declare(
+    RTTI
+    GIT_REPOSITORY https://github.com/wmesci/RTTI.git
+    GIT_TAG main  # 或指定版本标签
+)
+FetchContent_MakeAvailable(RTTI)
+
+target_link_libraries(YourTarget PRIVATE rtti::rtti)
 ```
 
-对于值类型
+### 通过安装使用
+```bash
+git clone https://github.com/wmesci/RTTI.git
+cd RTTI
+mkdir build && cd build
+cmake ..
+make
+sudo make install
+cmake
+find_package(RTTI REQUIRED)
+target_link_libraries(YourTarget PRIVATE rtti::rtti)
+```
+
+## 快速开始
+
+### 引用类型（继承自 Object）
+
 ```cpp
-class Vector3
+#include <RTTI/RTTI.h>
+#include <RTTI/Object.h>
+
+class MyClass : public rtti::Object
 {
+    TYPE_DECLARE(rtti::Object) // 声明基类
 public:
-    float x, y, z;
- 
-    Vector3();
- 
-    Vector3(float x, float y, float z);
- 
-    float GetLength() const;
- 
-    operator Vector2() const;
+    MyClass(int value) : value_(value) {}
+  
+    int GetValue() const { return value_; }
+    void SetValue(int v) { value_ = v; }
+  
+private:
+    int value_;
 };
- 
+
+// 注册类型和成员
+TypeRegister<MyClass>::New("MyClass")
+    .constructor<int>()  // 注册构造函数
+    .property("Value", &MyClass::GetValue, &MyClass::SetValue)  // 注册属性
+    .method("SetValue", &MyClass::SetValue);  // 注册方法
+```
+### 值类型
+
+```cpp
+struct Vector3
+{
+    float x, y, z;
+  
+    float GetLength() const { return std::sqrt(x*x + y*y + z*z); }
+};
+
+// 注册值类型
 TypeRegister<Vector3>::New("Vector3")
-    .constructor<>() // 构造函数，模版参数为构造函数的参数类型
-    .constructor<float, float, float>()
-    .convert<Vector2>() // 转换器，表示当前类型可以转换为 Vector2，内部使用单参数构造函数和转换运算符
+    .constructor<>()  // 默认构造函数
     .property("x", &Vector3::x)
     .property("y", &Vector3::y)
     .property("z", &Vector3::z)
-    .method("Length", &Vector3::GetLength);
+    .method("GetLength", &Vector3::GetLength);
 ```
 
-## 获取类型
+## 使用反射
+
 ```cpp
-// 通过类型名称查找类型
-rtti::Type* type = rtti::Type::Find("MyClass");
- 
-// 使用 type_of
-rtti::Type* type = rtti::type_of<int>(); // 获取 int 类型的 Type* 对象
-rtti::type_of<MyClass>() == rtti::type_of<std::shared_ptr<MyClass>>();
-rtti::type_of<MyClass>() == rtti::type_of<std::weak_ptr<MyClass>>();
-rtti::type_of<void>() == nullptr;
- 
-// 对于引用类型，可以使用 GetRttiType 方法获取其实际类型
-std::shared_ptr<rtti::Object> obj(new MyClass(123));
-obj->GetRttiType() == rtti::type_of<MyClass>();
+// 创建对象
+auto obj = rtti::create<MyClass>(42);
+
+// 获取类型信息
+Type* type = obj->GetRttiType();
+std::cout << "Type name: " << type->GetName() << std::endl;
+
+// 获取和设置属性
+auto prop = type->GetProperty("Value");
+if (prop)
+{
+    int value = 0;
+    prop->Get(obj, value);  // 获取属性值
+    std::cout << "Value: " << value << std::endl;
+  
+    prop->Set(obj, 100);    // 设置属性值
+}
+
+// 调用方法
+auto method = type->GetMethod("SetValue");
+if (method)
+{
+    method->Invoke(obj, 200);  // 调用方法
+}
 ```
 
-## 类型转换
-RTTI 库提供了 rtti::cast 方法用于在各种类型之间进行转换
-* 对于能够直接隐式转换的类型（子类转父类、int 转 float 等），cast 方法等同于直接赋值，没有任何额外的开销
-* 对于父类转子类，cast 方法内部会通过 RTTI 获取实际类型并判断是否能够进行转换
-* 如果类型不匹配，不能直接转换，cast 会尝试查找目标类型里合适的单参数构造函数（转换构造函数），并使用传入的变量进行调用
-* 如果没有合适的转换构造函数，则会尝试查找可用的转换器（对于引用类型是 ConvertTo 方法，对于值类型则是类型转换运算符）
-* cast 会通过 pOK 参数返回转换结果
-```cpp
-// 将当前类型转换成指定类型
-// 直接转换：
-//   Ptr<Subclass>  -->  Ptr<Base>
-//   Subclass*      -->  Base*
-//   int            -->  float
-// Unbox：
-//   ObjectPtr --> ValueType / ValueType*
-// Box：
-//   ValueType --> ObjectPtr
-template <class To, class From>
-auto cast(const From& from, bool* pOK);
-```
- 
+### 类型转换
 
-## 获取类型信息、创建实例、调用方法/属性...
 ```cpp
-rtti::Type* type = rtti::Type::Find("MyClass");
-rtti::ObjectPtr obj = type->Create<int>(123);
-type->GetMethod("Func")->Invoke(obj, { rtti::cast<rtti::ObjectPtr>(1.0f) });  // 调用方法
-type->GetProperty("Prop1")->SetValue(obj, rtti::cast<rtti::ObjectPtr>(123)); // 设置属性
+bool ok = false;
+auto derived = rtti::cast<DerivedClass>(baseObj, &ok);
+if (ok) {
+    // 转换成功
+}
 ```
 
-同时，RTTI 库还支持 Attribute 机制，可以给包括类型、属性、方法打上一些标签，并在运行时获取相关信息。例如上面注册 MyClass 类的 IntField 属性的时候，后面的 `{{HASH("min_value"), 100}, {HASH("max_value"), 100}}` 就是 Attribute，这里给 IntField 属性添加了两个 Attribute，分别是属性的最大值和最小值
-```cpp
-.property("IntField", &MyClass::IntField, {{HASH("min_value"), 0}, {HASH("max_value"), 100}})
-```
+## 进阶用法
 
-后续在可以这么使用：
+### 添加特性（Attributes）
 
 ```cpp
-rtti::PropertyInfo* prop = ...
+TypeRegister<MyClass>::New("MyClass")
+    .constructor<int>()
+    .property("Value", &MyClass::GetValue, &MyClass::SetValue, {
+        {HASH("min_value"), 0},
+        {HASH("max_value"), 100}
+    });
+
+// 获取特性
+rtti::PropertyInfo* prop = // 获取属性信息;
 if (prop->HasAttribute(HASH("min_value")) && prop->HasAttribute(HASH("max_value")))
 {
     int min_value = std::any_cast<int>(prop->GetAttribute(HASH("min_value")));
@@ -124,6 +152,73 @@ if (prop->HasAttribute(HASH("min_value")) && prop->HasAttribute(HASH("max_value"
 }
 ```
 
-> Attribute 实际上是一些键值对：
-> * key 是 size_t 类型，上面代码用了 HASH(编译时字符串 Hash ) 的方式生成 key 是为了提供更好的可读性，也可以直接填数字
-> * value 是 C++17 里的 std::any 类型，用于存放任意值，后续可以使用 any_cast 转换回原始的类型。这里建议不要存放过于复杂的类型，通常一些编译时常量以及 rtti::Type* 是安全的。
+### 自定义类型转换
+
+```cpp
+TypeRegister<MyClass>::New("MyClass")
+    .convert<int>()  // 允许 MyClass 转换为 int
+    .convert<std::string>();  // 允许 MyClass 转换为 string
+```
+
+### 类型系统
+
+RTTI 库支持两种对象类型：
+
+#### 引用类型
+
+* 继承自 rtti::Object
+* 使用引用语义（指针、智能指针等）
+* 变量赋值后多个变量指向同一对象
+
+#### 值类型
+
+* 不需要继承特定基类
+* 使用值语义
+* 变量赋值后成为独立实例
+
+### 类型操作
+
+#### 获取类型信息
+
+```cpp
+// 通过类型名称查找
+rtti::Type* type = rtti::Type::Find("MyClass");
+
+// 使用 type_of
+rtti::Type* type = rtti::type_of<int>();
+rtti::type_of<MyClass>() == rtti::type_of<std::shared_ptr<MyClass>>();
+
+// 获取对象的实际类型
+std::shared_ptr<rtti::Object> obj(new MyClass(123));
+obj->GetRttiType() == rtti::type_of<MyClass>();
+```
+
+#### 类型转换机制
+
+`rtti::cast` 方法支持多种转换方式：
+
+* 直接隐式转换（子类转父类、int 转 float 等）
+* 通过 RTTI 进行父类转子类转换
+* 使用转换构造函数
+* 使用转换器（引用类型的 ConvertTo 方法或值类型的转换运算符）
+
+## 最佳实践
+
+* 使用 TYPE_DECLARE 宏声明基类关系
+* 在全局命名空间中注册类型
+* 属性名使用 PascalCase 命名风格
+* 使用 HASH 宏优化字符串查找性能
+* 优先使用值类型处理小型对象
+
+## 构建与测试
+
+```bash
+mkdir build && cd build
+cmake .. -DRTTI_BUILD_TEST=ON
+make
+./RTTI-Test  # 运行测试
+```
+
+## 许可证
+
+MIT License

@@ -71,46 +71,46 @@ public:
     template <typename U>
     TypeRegister<T>& convert()
     {
-        type_of<T>()->m_typeConvertors.push_back({type_of<U>(), [](const ObjectPtr& obj, Type* targetType, ObjectPtr& target) -> bool
-                            {
-                                using TU = typename rtti::TypeWarper<U>::type;
-                                if constexpr (is_object<T>)
-                                {
-                                    std::shared_ptr<T> tobj = cast<std::shared_ptr<T>>(obj);
-                                    if constexpr (is_object<TU>)
-                                    {
-                                        std::shared_ptr<TU> uobj = nullptr;
-                                        if (tobj->template ConvertTo<std::shared_ptr<TU>>(uobj))
-                                        {
-                                            target = uobj;
-                                            return true;
-                                        }
-                                    }
-                                    else
-                                    {
-                                        TU uobj;
-                                        if (tobj->template ConvertTo<TU>(uobj))
-                                        {
-                                            target = rtti::Box(uobj);
-                                            return true;
-                                        }
-                                    }
-                                }
-                                else
-                                {
-                                    if constexpr (is_object<TU>)
-                                    {
-                                        target = static_cast<std::shared_ptr<TU>>(rtti::Unbox<T>(obj));
-                                        return true;
-                                    }
-                                    else
-                                    {
-                                        target = rtti::Box(static_cast<TU>(rtti::Unbox<T>(obj)));
-                                        return true;
-                                    }
-                                }
-                                return false;
-                            }});
+        type_of<T>()->m_typeConvertors.push_back({type_of<U>(), [](const ObjectPtr& obj, [[maybe_unused]] Type* targetType, ObjectPtr& target) -> bool
+                                                  {
+                                                      using TU = typename rtti::TypeWarper<U>::type;
+                                                      if constexpr (is_object<T>)
+                                                      {
+                                                          std::shared_ptr<T> tobj = cast<std::shared_ptr<T>>(obj);
+                                                          if constexpr (is_object<TU>)
+                                                          {
+                                                              std::shared_ptr<TU> uobj = nullptr;
+                                                              if (tobj->template ConvertTo<std::shared_ptr<TU>>(uobj))
+                                                              {
+                                                                  target = uobj;
+                                                                  return true;
+                                                              }
+                                                          }
+                                                          else
+                                                          {
+                                                              TU uobj;
+                                                              if (tobj->template ConvertTo<TU>(uobj))
+                                                              {
+                                                                  target = rtti::Box(uobj);
+                                                                  return true;
+                                                              }
+                                                          }
+                                                      }
+                                                      else
+                                                      {
+                                                          if constexpr (is_object<TU>)
+                                                          {
+                                                              target = static_cast<std::shared_ptr<TU>>(rtti::Unbox<T>(obj));
+                                                              return true;
+                                                          }
+                                                          else
+                                                          {
+                                                              target = rtti::Box(static_cast<TU>(rtti::Unbox<T>(obj)));
+                                                              return true;
+                                                          }
+                                                      }
+                                                      return false;
+                                                  }});
         return *this;
     }
 
@@ -245,52 +245,52 @@ inline Type* DefaultEnumRegister(Type* type)
     type->m_constructors.push_back(ConstructorInfo::Register(type, &ctor<T, long>));
     type->m_constructors.push_back(ConstructorInfo::Register(type, &ctor<T, unsigned long>));
 
-    type->m_typeConvertors.push_back({type_of<int8_t>(), [](const ObjectPtr& obj, Type* targetType, ObjectPtr& target) -> bool
+    type->m_typeConvertors.push_back({type_of<int8_t>(), [](const ObjectPtr& obj, [[maybe_unused]] Type* targetType, ObjectPtr& target) -> bool
                                       {
                                           target = rtti::Box(static_cast<int8_t>(rtti::Unbox<T>(obj)));
                                           return true;
                                       }});
-    type->m_typeConvertors.push_back({type_of<uint8_t>(), [](const ObjectPtr& obj, Type* targetType, ObjectPtr& target) -> bool
+    type->m_typeConvertors.push_back({type_of<uint8_t>(), [](const ObjectPtr& obj, [[maybe_unused]] Type* targetType, ObjectPtr& target) -> bool
                                       {
                                           target = rtti::Box(static_cast<uint8_t>(rtti::Unbox<T>(obj)));
                                           return true;
                                       }});
-    type->m_typeConvertors.push_back({type_of<int16_t>(), [](const ObjectPtr& obj, Type* targetType, ObjectPtr& target) -> bool
+    type->m_typeConvertors.push_back({type_of<int16_t>(), [](const ObjectPtr& obj, [[maybe_unused]] Type* targetType, ObjectPtr& target) -> bool
                                       {
                                           target = rtti::Box(static_cast<int16_t>(rtti::Unbox<T>(obj)));
                                           return true;
                                       }});
-    type->m_typeConvertors.push_back({type_of<uint16_t>(), [](const ObjectPtr& obj, Type* targetType, ObjectPtr& target) -> bool
+    type->m_typeConvertors.push_back({type_of<uint16_t>(), [](const ObjectPtr& obj, [[maybe_unused]] Type* targetType, ObjectPtr& target) -> bool
                                       {
                                           target = rtti::Box(static_cast<uint16_t>(rtti::Unbox<T>(obj)));
                                           return true;
                                       }});
-    type->m_typeConvertors.push_back({type_of<int32_t>(), [](const ObjectPtr& obj, Type* targetType, ObjectPtr& target) -> bool
+    type->m_typeConvertors.push_back({type_of<int32_t>(), [](const ObjectPtr& obj, [[maybe_unused]] Type* targetType, ObjectPtr& target) -> bool
                                       {
                                           target = rtti::Box(static_cast<int32_t>(rtti::Unbox<T>(obj)));
                                           return true;
                                       }});
-    type->m_typeConvertors.push_back({type_of<uint32_t>(), [](const ObjectPtr& obj, Type* targetType, ObjectPtr& target) -> bool
+    type->m_typeConvertors.push_back({type_of<uint32_t>(), [](const ObjectPtr& obj, [[maybe_unused]] Type* targetType, ObjectPtr& target) -> bool
                                       {
                                           target = rtti::Box(static_cast<uint32_t>(rtti::Unbox<T>(obj)));
                                           return true;
                                       }});
-    type->m_typeConvertors.push_back({type_of<int64_t>(), [](const ObjectPtr& obj, Type* targetType, ObjectPtr& target) -> bool
+    type->m_typeConvertors.push_back({type_of<int64_t>(), [](const ObjectPtr& obj, [[maybe_unused]] Type* targetType, ObjectPtr& target) -> bool
                                       {
                                           target = rtti::Box(static_cast<int64_t>(rtti::Unbox<T>(obj)));
                                           return true;
                                       }});
-    type->m_typeConvertors.push_back({type_of<uint64_t>(), [](const ObjectPtr& obj, Type* targetType, ObjectPtr& target) -> bool
+    type->m_typeConvertors.push_back({type_of<uint64_t>(), [](const ObjectPtr& obj, [[maybe_unused]] Type* targetType, ObjectPtr& target) -> bool
                                       {
                                           target = rtti::Box(static_cast<uint64_t>(rtti::Unbox<T>(obj)));
                                           return true;
                                       }});
-    type->m_typeConvertors.push_back({type_of<long>(), [](const ObjectPtr& obj, Type* targetType, ObjectPtr& target) -> bool
+    type->m_typeConvertors.push_back({type_of<long>(), [](const ObjectPtr& obj, [[maybe_unused]] Type* targetType, ObjectPtr& target) -> bool
                                       {
                                           target = rtti::Box(static_cast<long>(rtti::Unbox<T>(obj)));
                                           return true;
                                       }});
-    type->m_typeConvertors.push_back({type_of<unsigned long>(), [](const ObjectPtr& obj, Type* targetType, ObjectPtr& target) -> bool
+    type->m_typeConvertors.push_back({type_of<unsigned long>(), [](const ObjectPtr& obj, [[maybe_unused]] Type* targetType, ObjectPtr& target) -> bool
                                       {
                                           target = rtti::Box(static_cast<unsigned long>(rtti::Unbox<T>(obj)));
                                           return true;

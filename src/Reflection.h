@@ -128,16 +128,16 @@ struct TypeWarper<T, false>
 template <typename T>
 inline Type* type_of()
 {
-    return TypeWarper<remove_cr<T>>::ClassType();
+    return TypeWarper<rtti::remove_cr<T>>::ClassType();
 }
 
-#define TYPE_DECLARE(base)                                           \
-public:                                                              \
-    using RTTI_BASE_CLASS = base;                                    \
-    virtual rtti::Type* GetRttiType() const override                 \
-    {                                                                \
-        return rtti::CreateType<remove_cr<decltype(*this)>, base>(); \
-    }                                                                \
-    template <class T, class... Args>                                \
+#define TYPE_DECLARE(base)                                                 \
+public:                                                                    \
+    using RTTI_BASE_CLASS = base;                                          \
+    virtual rtti::Type* GetRttiType() const override                       \
+    {                                                                      \
+        return rtti::CreateType<rtti::remove_cr<decltype(*this)>, base>(); \
+    }                                                                      \
+    template <class T, class... Args>                                      \
     friend rtti::ObjectPtr rtti::ctor(Args... args);
 } // namespace rtti

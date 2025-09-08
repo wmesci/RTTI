@@ -101,7 +101,7 @@ public:
         return 0;
     }
 
-    void SetProp1(int v)
+    void SetProp1([[maybe_unused]] int v)
     {
         printf("void SetProp1()\n");
     }

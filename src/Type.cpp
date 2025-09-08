@@ -11,8 +11,8 @@ Type::Type(const std::string& name, size_t size, TypeFlags flags, Type* underlyi
     , m_name(name)
     , m_size((uint32_t)size)
     , m_flags(flags)
-    , m_underlyingType(underlyingType)
     , m_baseType(baseType)
+    , m_underlyingType(underlyingType)
     , next(header)
 {
     header = this;
