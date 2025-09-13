@@ -42,12 +42,17 @@ bool Type::IsValueType() const
 
 bool Type::IsEnum() const
 {
-    return ((int)m_flags & (int)TypeFlags::Enum) != 0;
+    return HasFlag(TypeFlags::Enum);
 }
 
 bool Type::IsPointer() const
 {
-    return ((int)m_flags & (int)TypeFlags::Pointer) != 0;
+    return HasFlag(TypeFlags::Pointer);
+}
+
+bool Type::HasFlag(TypeFlags flag) const
+{
+    return ((int)m_flags & (int)flag) != 0;
 }
 
 const std::vector<EnumInfo>& Type::GetEnumInfos() const
@@ -118,7 +123,13 @@ bool Type::CanConvertTo(Type* targetType) const
     if (targetType->IsAssignableFrom(sourceType))
         return true;
 
-    if (this->IsPointer() && targetType == type_of<void*>())
+    if (sourceType->IsPointer() && targetType == type_of<void*>())
+        return true;
+
+    if (sourceType->IsEnum() && targetType->HasFlag(TypeFlags::Integral))
+        return true;
+
+    if (sourceType->HasFlag(TypeFlags::Integral) && targetType->IsEnum())
         return true;
 
     for (auto&& i : targetType->m_constructors)
@@ -178,6 +189,18 @@ bool Type::Convert(const ObjectPtr& obj, Type* targetType, ObjectPtr& target)
         {
             return i.Convert(obj, i.TargetType, target);
         }
+    }
+
+    if (sourceType->IsEnum() && targetType->HasFlag(TypeFlags::Integral))
+    {
+        ObjectPtr underlyingObj = nullptr;
+        return Convert(obj, sourceType->GetUnderlyingType(), underlyingObj) && Convert(underlyingObj, targetType, target);
+    }
+
+    if (sourceType->HasFlag(TypeFlags::Integral) && targetType->IsEnum())
+    {
+        ObjectPtr underlyingObj = nullptr;
+        return Convert(obj, sourceType->GetUnderlyingType(), underlyingObj) && Convert(underlyingObj, targetType, target);
     }
 
     return false;

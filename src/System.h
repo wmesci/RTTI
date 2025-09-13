@@ -39,11 +39,14 @@
 
 namespace rtti
 {
+template <typename T>
+using Ptr = std::shared_ptr<T>;
+
 class Object;
-using ObjectPtr = std::shared_ptr<Object>;
+using ObjectPtr = Ptr<Object>;
 
 class ObjectBox;
-using ObjectBoxPtr = std::shared_ptr<ObjectBox>;
+using ObjectBoxPtr = Ptr<ObjectBox>;
 
 template <typename T>
 class Boxed;
@@ -54,15 +57,29 @@ class ConstructorInfo;
 class MethodInfo;
 class PropertyInfo;
 
-constexpr size_t Hash(const char* str, size_t seed = 0)
+inline constexpr void hash_combine(size_t& seed, size_t hash)
 {
-    return 0 == *str ? seed : Hash(str + 1, seed ^ (*str + 0x9e3779b9 + (seed << 6) + (seed >> 2)));
+    hash += 0x9e3779b9 + (seed << 6) + (seed >> 2);
+    seed ^= hash;
+}
+
+template <typename... Args>
+inline constexpr size_t hash(const Args&... args)
+{
+    size_t seed = 0;
+    (hash_combine(seed, std::hash<Args>()(args)), ...);
+    return seed;
+}
+
+constexpr size_t HashString(const char* str, size_t seed = 0)
+{
+    return 0 == *str ? seed : HashString(str + 1, seed ^ (*str + 0x9e3779b9 + (seed << 6) + (seed >> 2)));
 }
 
 template <auto V>
 static constexpr auto force_consteval = V;
 
-#define HASH(str) rtti::force_consteval<rtti::Hash(str)>
+#define HASH(str) rtti::force_consteval<rtti::HashString(str)>
 
 template <typename T>
 using remove_cr = std::remove_const_t<std::remove_reference_t<T>>;
@@ -70,11 +87,14 @@ using remove_cr = std::remove_const_t<std::remove_reference_t<T>>;
 template <typename T>
 constexpr bool is_object = std::is_base_of<Object, T>::value || std::is_same<Object, T>::value;
 
-template <class T, class... Args>
-inline ObjectPtr ctor(Args... args);
+template <typename T>
+concept ObjectType = is_object<T>;
 
 template <typename T>
-inline Type* type_of();
+concept ValueType = !is_object<T>;
+
+template <class T, class... Args>
+inline ObjectPtr ctor(Args... args);
 
 template <class To, class From>
 inline auto cast(const From& from, bool* pOK = nullptr);

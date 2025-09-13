@@ -4,7 +4,17 @@
 
 using namespace std::string_literals;
 
-using namespace rtti;
+constexpr size_t DisplayNameAttr = HASH("DisplayName");
+
+inline std::pair<size_t, std::any> DisplayName(const std::string& name)
+{
+    return {DisplayNameAttr, name};
+}
+
+inline std::string GetDisplayName(rtti::Attributable* attributable, const std::string& defaultValue)
+{
+    return attributable->GetAttribute<std::string>(DisplayNameAttr, defaultValue);
+}
 
 enum class TestEnum
 {
@@ -32,13 +42,40 @@ struct TestStruct
         printf("TestStruct::Func %d - %d\n", a, TE);
         TE = (TestEnum)a;
     }
+
+    static void RegisterRTTI()
+    {
+        rtti::TypeRegister<TestStruct>::New()
+            .constructor<>()
+            .convert<int>()
+            .property("TE"s, &TestStruct::TE, {})
+            .method("Func"s, &TestStruct::Func);
+    }
 };
 
-class TestBase : public Object
+class TestBase : public rtti::Object
 {
-    TYPE_DECLARE(Object)
+    TYPE_DECLARE(rtti::Object)
+
 public:
-    TestBase() { printf("ctor()\n"); }
+    static void RegisterRTTI()
+    {
+        rtti::TypeRegister<TestBase>::New()
+            .property("TestBaseA"s, &TestBase::TestBaseA)
+            .method("Func1"s, &TestBase::Func1)
+            .method("BaseFunc2"s, &TestBase::BaseFunc2)
+            .method("BaseFunc3"s, &TestBase::BaseFunc3)
+            .method("BaseFunc4"s, &TestBase::BaseFunc4)
+            .method("BaseFunc5"s, &TestBase::BaseFunc5)
+            //.method("BaseFunc6"s, &TestBase::BaseFunc6)
+            .method("BaseFunc7"s, &TestBase::BaseFunc7);
+    }
+
+public:
+    TestBase()
+    {
+        printf("ctor()\n");
+    }
 
     int32_t TestBaseA = 1;
 
@@ -75,7 +112,7 @@ public:
     //     a = 31415926;
     // }
 
-    void BaseFunc7(const ObjectPtr& a) const
+    void BaseFunc7(const rtti::ObjectPtr& a) const
     {
         printf("void BaseFunc7(const ObjectPtr& [%s]) const\n", a->GetRttiType()->GetName().c_str());
     }
@@ -84,6 +121,32 @@ public:
 class Test : public TestBase
 {
     TYPE_DECLARE(TestBase)
+
+public:
+    static void RegisterRTTI()
+    {
+        rtti::TypeRegister<Test>::New()
+            .constructor<>()
+            .constructor<int>()
+            .constructor<int, float>()
+            .convert<int>()
+            .property("A"s, &Test::A, {})
+            .property("B"s, &Test::B, {})
+            .property("C"s, &Test::C, {})
+            .property("D"s, &Test::D, {})
+            .property("E"s, &Test::E, {})
+            .property("Prop1"s, &Test::GetProp1, &Test::SetProp1)
+            .property("Prop2"s, &Test::GetProp2)
+            .property("Prop3"s, &Test::GetProp3)
+            .method("Func2"s, &Test::Func2)
+            .method("Func3"s, &Test::Func3)
+            .method("Func4"s, &Test::Func4)
+            .method("Func5"s, &Test::Func5)
+            .method("Func6"s, &Test::Func6)
+            .method("Func7"s, &Test::Func7)
+            .method("Func8"s, &Test::Func8);
+    }
+
 public:
     Test() { printf("ctor()\n"); }
     Test(int i) { printf("ctor(%d)\n", i); }
@@ -91,9 +154,9 @@ public:
 
     int32_t A = 1;
     std::string B;
-    ObjectPtr C;
+    rtti::ObjectPtr C;
     TestEnum D = TestEnum::Value1;
-    const TestStruct E;
+    TestStruct E;
 
     int GetProp1()
     {
@@ -101,7 +164,7 @@ public:
         return 0;
     }
 
-    void SetProp1([[maybe_unused]] int v)
+    void SetProp1(int v)
     {
         printf("void SetProp1()\n");
     }
@@ -134,7 +197,7 @@ public:
         return 34;
     }
 
-    ObjectPtr Func4() const
+    rtti::ObjectPtr Func4() const
     {
         printf("ObjectPtr Func4() const\n");
         return std::make_shared<Test>();
@@ -179,18 +242,18 @@ struct HandleBase
 public:
     HandleBase() = default;
 
-    HandleBase(const ObjectPtr& p)
+    HandleBase(const rtti::ObjectPtr& p)
         : m_ptr(p)
     {
     }
 
-    ObjectPtr GetPtr() const
+    rtti::ObjectPtr GetPtr() const
     {
         return m_ptr;
     }
 
 protected:
-    ObjectPtr m_ptr;
+    rtti::ObjectPtr m_ptr;
 };
 
 template <typename T>
@@ -219,9 +282,17 @@ public:
     {
         return std::static_pointer_cast<T>(m_ptr);
     }
+
+    static void RegisterRTTI()
+    {
+        rtti::TypeRegister<Handle<T>>::New("Handle<"s + rtti::GetTypeName<T>() + ">"s, {{HASH("handle"), rtti::type_of<T>()}})
+            .template constructor<std::shared_ptr<T>>()
+            .template convert<HandleBase>()
+            .template convert<T>();
+    }
 };
 
-void print(MethodBase* m)
+void print(rtti::MethodBase* m)
 {
     if (m->ReturnType() == nullptr)
         printf("void ");
@@ -252,121 +323,81 @@ void print(MethodBase* m)
 
 void RegisterTypes()
 {
-    InitCoreType();
+    rtti::InitCoreType();
 
-    TypeRegister<TestEnum>::New("TestEnum"s, {{HASH("displayName"), "TestEnumForDisplay"s}})
+    rtti::TypeRegister<TestEnum>::New({DisplayName("TestEnumForDisplay")})
         .value("Value1", TestEnum::Value1)
         .value("Value2", TestEnum::Value2);
 
-    TypeRegister<TestStruct>::New("TestStruct"s)
-        .convert<int>()
-        .property("TE"s, &TestStruct::TE)
-        .method("Func"s, &TestStruct::Func);
+    TestStruct::RegisterRTTI();
 
-    TypeRegister<TestBase>::New("TestBase"s)
-        .property("TestBaseA"s, &TestBase::TestBaseA)
-        .method("Func1"s, &TestBase::Func1)
-        .method("BaseFunc2"s, &TestBase::BaseFunc2)
-        .method("BaseFunc3"s, &TestBase::BaseFunc3)
-        .method("BaseFunc4"s, &TestBase::BaseFunc4)
-        .method("BaseFunc5"s, &TestBase::BaseFunc5)
-        //.method("BaseFunc6"s, &TestBase::BaseFunc6)
-        .method("BaseFunc7"s, &TestBase::BaseFunc7);
+    TestBase::RegisterRTTI();
+    Test::RegisterRTTI();
 
-    TypeRegister<Test>::New("Test"s)
-        .constructor<>()
-        .constructor<int>()
-        .constructor<int, float>()
-        .convert<int>()
-        .property("A"s, &Test::A, {{HASH("clonable"), true}, {HASH("min_value"), 100}, {HASH("max_value"), 100}})
-        .property("B"s, &Test::B)
-        .property("C"s, &Test::C)
-        .property("D"s, &Test::D)
-        .property("E"s, &Test::E)
-        .property("Prop1"s, &Test::GetProp1, &Test::SetProp1)
-        .property("Prop2"s, &Test::GetProp2)
-        .property("Prop3"s, &Test::GetProp3)
-        .method("Func2"s, &Test::Func2)
-        .method("Func3"s, &Test::Func3)
-        .method("Func4"s, &Test::Func4)
-        .method("Func5"s, &Test::Func5)
-        .method("Func6"s, &Test::Func6)
-        .method("Func7"s, &Test::Func7)
-        .method("Func8"s, &Test::Func8);
-
-    TypeRegister<Handle<TestBase>>::New("Handle<TestBase>"s, {{HASH("handle"), type_of<TestBase>()}})
-        .constructor<std::shared_ptr<TestBase>>()
-        .convert<HandleBase>()
-        .convert<TestBase>();
-
-    TypeRegister<Handle<Test>>::New("Handle<Test>"s, {{HASH("handle"), type_of<Test>()}})
-        .constructor<std::shared_ptr<Test>>()
-        .convert<HandleBase>()
-        .convert<Test>();
+    Handle<TestBase>::RegisterRTTI();
+    Handle<Test>::RegisterRTTI();
 }
 
 int main([[maybe_unused]] int argc, [[maybe_unused]] char* argv[])
 {
     RegisterTypes();
 
-    printf("%s - %d - %s\n", type_of<int*>()->GetName().c_str(), type_of<int*>()->IsPointer(), type_of<int*>()->GetUnderlyingType()->GetName().c_str());
+    printf("%s - %d - %s\n", rtti::type_of<int*>()->GetName().c_str(), rtti::type_of<int*>()->IsPointer(), rtti::type_of<int*>()->GetUnderlyingType()->GetName().c_str());
 
-    assert(type_of<TestEnum2>()->IsEnum());
-    assert(type_of<TestEnum2>()->CanConvertTo<int32_t>());
+    assert(rtti::type_of<TestEnum2>()->IsEnum());
+    assert(rtti::type_of<TestEnum2>()->CanConvertTo<int32_t>());
 
-    assert(type_of<Test>() == type_of<std::shared_ptr<Test>>());
-    assert(type_of<Test>()->CanConvertTo<int32_t>());
+    assert(rtti::type_of<Test>() == rtti::type_of<std::shared_ptr<Test>>());
+    assert(rtti::type_of<Test>()->CanConvertTo<int32_t>());
 
     Handle<TestBase> ht = Handle<Test>(std::make_shared<Test>());
 
-    assert(ht->GetRttiType() == type_of<Test>());
+    assert(ht->GetRttiType() == rtti::type_of<Test>());
 
-    ObjectPtr box_ht = rtti::Box(ht);
-    printf("box_ht --> %s", box_ht->GetRttiType()->GetName().c_str());
+    rtti::ObjectPtr box_ht = rtti::Box(ht);
+    printf("box_ht --> %s\n", box_ht->GetRttiType()->GetName().c_str());
 
-    Type* inner_type = box_ht->GetRttiType()->GetAttribute<rtti::Type*>(HASH("handle"));
-    assert(inner_type == type_of<TestBase>());
+    rtti::Type* inner_type = box_ht->GetRttiType()->GetAttribute<rtti::Type*>(HASH("handle"));
+    assert(inner_type == rtti::type_of<TestBase>());
 
-    auto ht2 = cast<HandleBase>(box_ht).GetPtr();
+    auto ht2 = rtti::cast<HandleBase>(box_ht).GetPtr();
     assert(ht2 == ht.GetPtr());
 
-    assert(type_of<TestEnum>()->GetAttribute<std::string>(HASH("displayName")) == "TestEnumForDisplay"s);
+    assert(rtti::type_of<TestEnum>()->GetAttribute<std::string>(DisplayNameAttr) == "TestEnumForDisplay"s);
 
-    assert(type_of<int>() == Box(123)->GetRttiType());
+    assert(rtti::type_of<int>() == rtti::Box(123)->GetRttiType());
 
-    auto type = Type::Find("Test"s);
-
-    assert(type->GetProperty("A")->HasAttribute(HASH("clonable")));
-    assert(!type->GetProperty("B")->HasAttribute(HASH("clonable")));
+    auto type = rtti::Type::Find("Test"s);
 
     auto obj = type->Create<Test>();
     auto obj1 = type->Create<Test>(123);
     auto obj2 = type->Create<Test>(123, 789.12f);
 
+    assert(rtti::cast<void*>(obj) == obj.get());
     assert(rtti::cast<Test>((TestBase*)obj.get()) == obj.get());
     assert(rtti::cast<Test*>((TestBase*)obj.get()) == obj.get());
 
-    ObjectPtr ttt;
-    Type::Convert(obj, type_of<int>(), ttt);
+    rtti::ObjectPtr ttt;
+    rtti::Type::Convert(obj, rtti::type_of<int>(), ttt);
 
-    assert(cast<int>(ttt) == 128);
-    assert(cast<uint16_t>(ttt) == 128);
-    assert(abs(cast<double>(ttt) - 128.0) <= 0.0001);
-    auto comparable_enum_int = is_comparable<TestEnum, int>();
-    assert(comparable_enum_int);
-    auto comparable_int_enum = is_comparable<int, TestEnum>();
-    assert(comparable_int_enum);
-    auto comparable_int_double = is_comparable<int, double>();
+    assert(rtti::cast<int>(ttt) == 128);
+    assert(rtti::cast<uint16_t>(ttt) == 128);
+    assert(abs(rtti::cast<double>(ttt) - 128.0) <= 0.0001);
+    auto comparable_enum_enum = rtti::is_comparable<TestEnum, TestEnum>();
+    assert(comparable_enum_enum);
+    auto comparable_enum_int = rtti::is_comparable<TestEnum, int>();
+    assert(!comparable_enum_int);
+    auto comparable_int_double = rtti::is_comparable<int, double>();
     assert(comparable_int_double);
-    auto comparable_int_string = is_comparable<int, std::string>();
+    auto comparable_int_string = rtti::is_comparable<int, std::string>();
     assert(!comparable_int_string);
-    assert(compare(ttt, 128.0f) == CompareResult::Equals);
-    assert(compare(0u, ttt) == CompareResult::NotEquals);
-    assert(compare(ttt, std::string("xxx")) == CompareResult::Failed);
+    assert(rtti::compare(ttt, 128.0f) == rtti::CompareResult::Equals);
+    assert(rtti::compare(0u, ttt) == rtti::CompareResult::NotEquals);
+    assert(rtti::compare(ttt, std::string("xxx")) == rtti::CompareResult::Failed);
     assert(ttt->GetHashCode() == std::hash<int>()(128));
 
-    assert(cast<TestBase>(obj) != nullptr);
-    assert(cast<Test>(cast<TestBase>(obj)) != nullptr);
+    assert(rtti::cast<TestBase>(obj) != nullptr);
+    assert(rtti::cast<Test>(rtti::cast<TestBase>(obj)) != nullptr);
 
     obj->A = 123;
     obj->B = "str"s;
@@ -416,18 +447,18 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char* argv[])
 
     type->GetMethod("Func1"s)->Invoke(obj, {});
     type->GetMethod("Func2"s)->Invoke(obj, {});
-    printf("  ret = %d\n", Unbox<int>(type->GetMethod("Func3"s)->Invoke(obj, {})));
+    printf("  ret = %d\n", rtti::Unbox<int>(type->GetMethod("Func3"s)->Invoke(obj, {})));
     printf("  ret = %s\n", type->GetMethod("Func4"s)->Invoke(obj, {})->GetRttiType()->GetName().c_str());
-    type->GetMethod("Func5"s, {type_of<int>()})->Invoke(obj, {Box(TestEnum::Value1)});
-    type->GetMethod("Func5"s, {type_of<int>()})->Invoke(obj, {Box(TestStruct())});
-    type->GetMethod("Func5"s, {type_of<int>()})->Invoke(obj, {std::make_shared<Test>()});
-    type->GetMethod("Func6"s, {type_of<std::shared_ptr<int>>()})->Invoke(obj, {Box(std::make_shared<int>(135))});
-    type->GetMethod("Func7"s, {type_of<TestBase>()})->Invoke(obj, {obj});
-    type->GetMethod("Func8"s, {type_of<TestEnum>()})->Invoke(obj, {Box(123)});
+    type->GetMethod("Func5"s, {rtti::type_of<int>()})->Invoke(obj, {rtti::Box(TestEnum::Value1)});
+    type->GetMethod("Func5"s, {rtti::type_of<int>()})->Invoke(obj, {rtti::Box(TestStruct())});
+    type->GetMethod("Func5"s, {rtti::type_of<int>()})->Invoke(obj, {std::make_shared<Test>()});
+    type->GetMethod("Func6"s, {rtti::type_of<std::shared_ptr<int>>()})->Invoke(obj, {rtti::Box(std::make_shared<int>(135))});
+    type->GetMethod("Func7"s, {rtti::type_of<TestBase>()})->Invoke(obj, {obj});
+    type->GetMethod("Func8"s, {rtti::type_of<TestEnum>()})->Invoke(obj, {rtti::Box(123)});
 
     TestStruct testStruct;
-    type_of<TestStruct>()->GetMethod("Func"s)->Invoke(Box(testStruct), {Box(3)});
-    type_of<TestStruct>()->GetMethod("Func"s)->Invoke(Box(&testStruct), {Box(4)});
+    rtti::type_of<TestStruct>()->GetMethod("Func"s)->Invoke(rtti::Box(testStruct), {rtti::Box(3)});
+    rtti::type_of<TestStruct>()->GetMethod("Func"s)->Invoke(rtti::Box(&testStruct), {rtti::Box(4)});
 
     assert(testStruct.TE == (TestEnum)4);
 

@@ -21,7 +21,7 @@ class Boxed : public ObjectBox
     static_assert(!std::is_const<T>::value);
 
 public:
-    using RTTI_BASE_CLASS = ObjectBox;
+    using BASE_TYPE = ObjectBox;
 
     virtual rtti::Type* GetRttiType() const override
     {
@@ -34,6 +34,18 @@ public:
             return std::hash<T>()(object);
         else
             return Object::GetHashCode();
+    }
+
+    Ptr<Object> Clone() const override
+    {
+        if constexpr (std::is_copy_constructible<T>::value)
+        {
+            return std::make_shared<Boxed<T>>(object);
+        }
+        else
+        {
+            return nullptr;
+        }
     }
 
 private:
@@ -61,15 +73,15 @@ public:
     }
 };
 
-template <typename T>
-inline std::enable_if_t<!is_object<typename TypeWarper<remove_cr<T>>::type>, ObjectPtr> Box(T value)
+template <ValueType T>
+inline ObjectPtr Box(T value)
 {
     return std::make_shared<Boxed<T>>(value);
 }
 
 //  Unbox<int>(...)   int   int&   int*
-template <typename T>
-inline std::enable_if_t<!is_object<typename TypeWarper<remove_cr<T>>::type>, T> Unbox(const ObjectPtr& ptr)
+template <ValueType T>
+inline T Unbox(const ObjectPtr& ptr)
 {
     static_assert(!std::is_rvalue_reference<T>::value);
 

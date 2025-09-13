@@ -3,7 +3,17 @@
 
 namespace rtti
 {
-class Object
+enum class CloneOption
+{
+    None,
+    Shallow,
+    Deep
+};
+
+constexpr size_t CloneOptionAttribute = HASH("CloneOptionAttribute");
+constexpr size_t ClonableAttribute = HASH("ClonableAttribute");
+
+class Object : public std::enable_shared_from_this<Object>
 {
 private:
     Object(const Object&) = delete;
@@ -17,9 +27,11 @@ public:
 
     virtual Type* GetRttiType() const;
 
+    virtual Ptr<Object> Clone() const;
+
     virtual ~Object();
 
 public:
-    using RTTI_BASE_CLASS = void;
+    using BASE_TYPE = void;
 };
 } // namespace rtti

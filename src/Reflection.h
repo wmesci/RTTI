@@ -4,6 +4,70 @@
 
 namespace rtti
 {
+template <typename T>
+struct inner_type
+{
+    using type = T;
+};
+
+template <typename T>
+struct inner_type<std::shared_ptr<T>>
+{
+    using type = T;
+};
+
+template <typename T>
+struct inner_type<std::weak_ptr<T>>
+{
+    using type = T;
+};
+
+// Object Ptr<Object>
+// type: Object
+template <typename T, bool isobject = is_object<typename inner_type<remove_cr<T>>::type>>
+struct TypeWarper
+{
+    using type = typename inner_type<remove_cr<T>>::type;
+    using warper = type;
+    using vartype = Ptr<type>;
+    using base = type::BASE_TYPE;
+};
+
+template <>
+struct TypeWarper<void, false>
+{
+    using type = void;
+    using warper = void;
+    using vartype = void;
+    using base = void;
+};
+
+// ValueType Ptr<ValueType>
+// type: ...
+template <typename T>
+struct TypeWarper<T, false>
+{
+    using type = remove_cr<T>;
+    using warper = Boxed<T>;
+    using vartype = type;
+    using base = ObjectBox;
+};
+
+template <typename T>
+using type_t = TypeWarper<T>::type;
+
+template <typename T>
+using warper_t = TypeWarper<T>::warper;
+
+template <typename T>
+using vartype_t = TypeWarper<T>::vartype;
+
+template <typename T>
+using base_type_t = TypeWarper<T>::base;
+
+template <typename T>
+Type* type_of();
+
 struct EnumInfo
 {
     int64_t number;
@@ -21,8 +85,10 @@ struct ParameterInfo
 enum class TypeFlags
 {
     None = 0,
-    Enum = 1,
-    Pointer = 2
+    Pointer = 1,
+    Enum = 2,
+    Integral = 4,
+    Floating = 8,
 };
 
 extern Type* NewType(const std::string& name, size_t size, TypeFlags flags, Type* underlyingType, Type* base);
@@ -39,105 +105,75 @@ inline std::string GetTypeName()
         return std::string(NAMEOF_SHORT_TYPE(CLS));
 }
 
-template <typename CLS>
-Type* CreateType()
-{
-    static_assert(std::is_same_v<Object, CLS>);
-    static Type* type = NewType(GetTypeName<CLS>(), sizeof(CLS), TypeFlags::None, nullptr, nullptr);
-    return type;
-}
-
 template <typename CLS, typename BASE>
-std::enable_if_t<!std::is_enum_v<CLS> && !std::is_pointer_v<CLS>, Type*> CreateType()
+inline Type* CreateType()
 {
-    static_assert(std::is_base_of_v<BASE, CLS> || std::is_same_v<BASE, ObjectBox>);
-    static Type* type = NewType(GetTypeName<CLS>(), sizeof(CLS), TypeFlags::None, nullptr, type_of<BASE>());
-    return type;
-}
-
-template <typename CLS, typename BASE>
-std::enable_if_t<std::is_pointer_v<CLS>, Type*> CreateType()
-{
-    static_assert(std::is_base_of_v<BASE, CLS> || std::is_same_v<BASE, ObjectBox>);
-    static Type* type = NewType(GetTypeName<CLS>(), sizeof(CLS), TypeFlags::Pointer, type_of<typename std::remove_pointer_t<CLS>>(), type_of<BASE>());
-    return type;
-}
-
-template <typename CLS, typename BASE>
-std::enable_if_t<std::is_enum_v<CLS>, Type*> CreateType()
-{
-    static_assert(std::is_base_of_v<BASE, CLS> || std::is_same_v<BASE, ObjectBox>);
-    static Type* type = DefaultEnumRegister<CLS>(NewType(std::string(GetTypeName<CLS>()), sizeof(CLS), TypeFlags::Enum, type_of<typename std::underlying_type_t<CLS>>(), type_of<BASE>()));
-    return type;
-}
-
-template <typename T>
-struct InnerType
-{
-    using type = T;
-};
-
-template <typename T>
-struct InnerType<std::shared_ptr<T>>
-{
-    using type = T;
-};
-
-template <typename T>
-struct InnerType<std::weak_ptr<T>>
-{
-    using type = T;
-};
-
-// Object Ptr<Object>
-// type: Object
-// objtype: Object
-template <typename T, bool isobject = is_object<typename InnerType<remove_cr<T>>::type>>
-struct TypeWarper
-{
-    using type = typename InnerType<remove_cr<T>>::type;
-    using objtype = type;
-    static Type* ClassType()
+    if constexpr (std::is_same_v<CLS, Object>)
     {
-        if constexpr (std::is_same_v<objtype, void>)
-            return nullptr;
-        else if constexpr (std::is_same_v<objtype, Object>)
-            return CreateType<Object>();
-        else
-            return CreateType<type, typename objtype::RTTI_BASE_CLASS>();
+        static_assert(std::is_same_v<BASE, void>);
+        static Type* type = NewType(GetTypeName<CLS>(), sizeof(CLS), TypeFlags::None, nullptr, nullptr);
+        return type;
     }
-};
-
-template <>
-struct TypeWarper<void, false>
-{
-    static Type* ClassType() { return nullptr; }
-};
-
-// ValueType Ptr<ValueType>
-// type: ...
-// objtype: Boxed<...>
-template <typename T>
-struct TypeWarper<T, false>
-{
-    using type = remove_cr<T>;
-    using objtype = Boxed<type>;
-    static Type* ClassType() { return CreateType<type, typename objtype::RTTI_BASE_CLASS>(); }
-};
+    else if constexpr (std::is_pointer_v<CLS>)
+    {
+        static_assert(std::is_same_v<BASE, ObjectBox>);
+        static Type* type = NewType(GetTypeName<CLS>(), sizeof(CLS), TypeFlags::Pointer, type_of<typename std::remove_pointer_t<CLS>>(), type_of<BASE>());
+        return type;
+    }
+    else if constexpr (std::is_enum_v<CLS>)
+    {
+        static_assert(std::is_same_v<BASE, ObjectBox>);
+        static Type* type = NewType(GetTypeName<CLS>(), sizeof(CLS), TypeFlags::Enum, type_of<typename std::underlying_type_t<CLS>>(), type_of<BASE>());
+        DefaultEnumRegister<CLS>(type);
+        return type;
+    }
+    else if constexpr (std::is_integral_v<CLS>)
+    {
+        static_assert(std::is_same_v<BASE, ObjectBox>);
+        static Type* type = NewType(GetTypeName<CLS>(), sizeof(CLS), TypeFlags::Integral, nullptr, type_of<BASE>());
+        return type;
+    }
+    else if constexpr (std::is_floating_point_v<CLS>)
+    {
+        static_assert(std::is_same_v<BASE, ObjectBox>);
+        static Type* type = NewType(GetTypeName<CLS>(), sizeof(CLS), TypeFlags::Floating, nullptr, type_of<BASE>());
+        return type;
+    }
+    else
+    {
+        static_assert(std::is_base_of_v<BASE, CLS> || std::is_same_v<BASE, ObjectBox>);
+        static Type* type = NewType(GetTypeName<CLS>(), sizeof(CLS), TypeFlags::None, nullptr, type_of<BASE>());
+        return type;
+    }
+}
 
 template <typename T>
 inline Type* type_of()
 {
-    return TypeWarper<rtti::remove_cr<T>>::ClassType();
+    if constexpr (std::is_void_v<T>)
+    {
+        return nullptr;
+    }
+    else
+    {
+        using U = type_t<T>;
+
+        if constexpr (is_object<U>)
+            return CreateType<U, typename U::BASE_TYPE>();
+        else
+            return CreateType<U, ObjectBox>();
+    }
 }
 
-#define TYPE_DECLARE(base)                                                 \
-public:                                                                    \
-    using RTTI_BASE_CLASS = base;                                          \
-    virtual rtti::Type* GetRttiType() const override                       \
-    {                                                                      \
-        return rtti::CreateType<rtti::remove_cr<decltype(*this)>, base>(); \
-    }                                                                      \
-    template <class T, class... Args>                                      \
-    friend rtti::ObjectPtr rtti::ctor(Args... args);
+#define TYPE_DECLARE(...)                                                                           \
+public:                                                                                             \
+    using BASE_TYPE = __VA_ARGS__;                                                                  \
+    static_assert(std::is_base_of_v<rtti::Object, BASE_TYPE> || std::is_same_v<BASE_TYPE, Object>); \
+    virtual rtti::Type* GetRttiType() const override                                                \
+    {                                                                                               \
+        using THIS_TYPE = rtti::remove_cr<decltype(*this)>;                                         \
+        static_assert(std::is_base_of_v<BASE_TYPE, THIS_TYPE>);                                     \
+        return rtti::type_of<THIS_TYPE>();                                                          \
+    }
+
 } // namespace rtti

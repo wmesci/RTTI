@@ -6,8 +6,8 @@ cmake_minimum_required(VERSION 3.14)
 # 创建项目
 project(RTTI VERSION 1.0.0 LANGUAGES CXX)
 
-# 设置C++标准为C++17
-set(CMAKE_CXX_STANDARD 17)
+# 设置C++标准为C++20
+set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 

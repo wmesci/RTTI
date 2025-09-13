@@ -360,6 +360,11 @@ void InitCoreType()
         .compare<float>()
         .compare<double>();
 
+    TypeRegister<void*>::New("void*")
+        .constructor<>()
+        .constructor<void*>()
+        .compare<void*>();
+
     TypeRegister<std::string>::New("string")
         .constructor<>()
         .constructor<const std::string&>()

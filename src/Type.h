@@ -75,6 +75,8 @@ public:
 
     bool IsPointer() const;
 
+    bool HasFlag(TypeFlags flag) const;
+
     const std::vector<EnumInfo>& GetEnumInfos() const;
 
     bool GetEnumInfo(const int64_t& number, EnumInfo* pInfo) const;
@@ -210,8 +212,8 @@ inline CompareResult compare(const TL& left, const TR& right)
 template <class To, class From>
 inline auto cast(const From& from, bool* pOK)
 {
-    using TFrom = std::remove_pointer_t<typename TypeWarper<remove_cr<From>>::type>;
-    using TTo = std::remove_pointer_t<typename TypeWarper<remove_cr<To>>::type>;
+    using TFrom = std::remove_pointer_t<type_t<From>>;
+    using TTo = std::remove_pointer_t<type_t<To>>;
 
     static_assert(!std::is_pointer_v<TFrom> || !is_object<std::remove_pointer_t<TFrom>>);
     static_assert(!std::is_pointer_v<TTo> || !is_object<std::remove_pointer_t<TTo>>);
@@ -301,6 +303,11 @@ inline auto cast(const From& from, bool* pOK)
                     }
                 }
             }
+        }
+        else if constexpr (std::is_same_v<void*, remove_cr<To>>)
+        {
+            // Ptr -> void*
+            RETURN(from.get(), true)
         }
         else
         {
