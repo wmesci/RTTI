@@ -115,7 +115,7 @@ public:
 
     // 创建当前类型的实例
     template <typename T = Object, typename... Args>
-    std::shared_ptr<T> Create(Args&&... args) const
+    Ptr<T> Create(Args&&... args) const
     {
         return std::static_pointer_cast<T>(CreateInstance({cast<ObjectPtr>(args)...}));
     }
@@ -227,10 +227,10 @@ inline auto cast(const From& from, bool* pOK)
 
     if constexpr (is_object<TFrom>)
     {
-        static_assert(std::is_same_v<TFrom*, From> || std::is_same_v<std::shared_ptr<TFrom>, From> || std::is_same_v<std::weak_ptr<TFrom>, From>);
+        static_assert(std::is_same_v<TFrom*, From> || std::is_same_v<Ptr<TFrom>, From> || std::is_same_v<std::weak_ptr<TFrom>, From>);
         if constexpr (is_object<TTo>)
         {
-            static_assert(std::is_same_v<TTo, To> || std::is_same_v<TTo*, To> || std::is_same_v<std::shared_ptr<TTo>, To> || std::is_same_v<std::weak_ptr<TTo>, To>);
+            static_assert(std::is_same_v<TTo, To> || std::is_same_v<TTo*, To> || std::is_same_v<Ptr<TTo>, To> || std::is_same_v<std::weak_ptr<TTo>, To>);
 
             // if constexpr (std::is_same_v<TFrom, TTo> || std::is_convertible_v<TFrom, TTo>)
             //{
@@ -246,14 +246,14 @@ inline auto cast(const From& from, bool* pOK)
             //
             //        if constexpr (std::is_same_v<std::weak_ptr<TFrom>, From>)
             //        {
-            //            if constexpr (std::is_same_v<TTo, To> || std::is_same_v<std::shared_ptr<TTo>, To>) // WPtr<Subclass> --> Base / SPtr<Base>
+            //            if constexpr (std::is_same_v<TTo, To> || std::is_same_v<Ptr<TTo>, To>) // WPtr<Subclass> --> Base / SPtr<Base>
             //                RETURN(To(from.lock()), true)
             //            else if constexpr (std::is_same_v<std::weak_ptr<TTo>, To>) // WPtr<Subclass> --> WPtr<Base>
             //                RETURN(To(from), true)
             //        }
-            //        else if constexpr (std::is_same_v<std::shared_ptr<TFrom>, From>)
+            //        else if constexpr (std::is_same_v<Ptr<TFrom>, From>)
             //        {
-            //            if constexpr (std::is_same_v<TTo, To> || std::is_same_v<std::shared_ptr<TTo>, To>) // SPtr<Subclass> --> Base / SPtr<Base>
+            //            if constexpr (std::is_same_v<TTo, To> || std::is_same_v<Ptr<TTo>, To>) // SPtr<Subclass> --> Base / SPtr<Base>
             //                RETURN(To(from), true)
             //            else if constexpr (std::is_same_v<std::weak_ptr<TTo>, To>) // SPtr<Subclass> --> WPtr<Base>
             //                RETURN(To(from), true)
@@ -280,13 +280,13 @@ inline auto cast(const From& from, bool* pOK)
                     if constexpr (std::is_same_v<std::weak_ptr<TFrom>, From>)
                     {
                         // WPtr<Base> --> Subclass / SPtr<Subclass> / WPtr<Subclass>
-                        auto obj = cast<std::shared_ptr<TTo>>(from.lock(), pOK);
+                        auto obj = cast<Ptr<TTo>>(from.lock(), pOK);
                         if constexpr (std::is_same_v<std::weak_ptr<TTo>, To>)
                             RETURN(std::weak_ptr<TTo>(obj), true)
                         else
                             RETURN(obj, true)
                     }
-                    else if constexpr (std::is_same_v<std::shared_ptr<TFrom>, From>)
+                    else if constexpr (std::is_same_v<Ptr<TFrom>, From>)
                     {
                         if (from != nullptr)
                         {
@@ -294,11 +294,11 @@ inline auto cast(const From& from, bool* pOK)
                             if (Type::Convert(from, type_of<TTo>(), target))
                                 RETURN(std::static_pointer_cast<TTo>(target), true)
                             else
-                                RETURN(std::shared_ptr<TTo>(nullptr), false)
+                                RETURN(Ptr<TTo>(nullptr), false)
                         }
                         else
                         {
-                            RETURN(std::shared_ptr<TTo>(nullptr), true)
+                            RETURN(Ptr<TTo>(nullptr), true)
                         }
                     }
                 }
@@ -345,7 +345,7 @@ inline auto cast(const From& from, bool* pOK)
             if (Type::Convert(Box(from), type_of<TTo>(), target))
                 RETURN(std::static_pointer_cast<TTo>(target), true)
 
-            RETURN(std::shared_ptr<TTo>(nullptr), false)
+            RETURN(Ptr<TTo>(nullptr), false)
         }
         else
         {

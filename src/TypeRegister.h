@@ -30,7 +30,7 @@ template <class T, class... Args>
 inline rtti::ObjectPtr ctor(Args... args)
 {
     if constexpr (rtti::is_object<T>)
-        return std::shared_ptr<T>(new T(std::forward<Args>(args)...));
+        return Ptr<T>(new T(std::forward<Args>(args)...));
     else
         return rtti::Box(T(std::forward<Args>(args)...));
 }
@@ -87,16 +87,16 @@ public:
     template <typename U>
     TypeRegister<T>& convert()
     {
-        type_of<T>()->m_typeConvertors.push_back({type_of<U>(), [](const ObjectPtr& obj, Type* targetType, ObjectPtr& target) -> bool
+        type_of<T>()->m_typeConvertors.push_back({type_of<U>(), [](const ObjectPtr& obj, [[maybe_unused]] Type* targetType, ObjectPtr& target) -> bool
                                                   {
                                                       using TU = type_t<U>;
                                                       if constexpr (is_object<T>)
                                                       {
-                                                          std::shared_ptr<T> tobj = cast<std::shared_ptr<T>>(obj);
+                                                          Ptr<T> tobj = cast<Ptr<T>>(obj);
                                                           if constexpr (is_object<TU>)
                                                           {
-                                                              std::shared_ptr<TU> uobj = nullptr;
-                                                              if (tobj->template ConvertTo<std::shared_ptr<TU>>(uobj))
+                                                              Ptr<TU> uobj = nullptr;
+                                                              if (tobj->template ConvertTo<Ptr<TU>>(uobj))
                                                               {
                                                                   target = uobj;
                                                                   return true;
@@ -116,7 +116,7 @@ public:
                                                       {
                                                           if constexpr (is_object<TU>)
                                                           {
-                                                              target = static_cast<std::shared_ptr<TU>>(rtti::Unbox<T>(obj));
+                                                              target = static_cast<Ptr<TU>>(rtti::Unbox<T>(obj));
                                                               return true;
                                                           }
                                                           else
@@ -271,7 +271,7 @@ inline Type* DefaultEnumRegister(Type* type)
     type->m_constructors.push_back(ConstructorInfo::Register(type, &ctor<T, const T&>));
     type->m_constructors.push_back(ConstructorInfo::Register(type, &ctor<T, UT>));
 
-    type->m_typeConvertors.push_back({type_of<UT>(), [](const ObjectPtr& obj, Type* targetType, ObjectPtr& target) -> bool
+    type->m_typeConvertors.push_back({type_of<UT>(), [](const ObjectPtr& obj, [[maybe_unused]] Type* targetType, ObjectPtr& target) -> bool
                                       {
                                           target = rtti::Box(static_cast<UT>(rtti::Unbox<T>(obj)));
                                           return true;

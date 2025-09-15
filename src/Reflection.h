@@ -11,7 +11,7 @@ struct inner_type
 };
 
 template <typename T>
-struct inner_type<std::shared_ptr<T>>
+struct inner_type<Ptr<T>>
 {
     using type = T;
 };
