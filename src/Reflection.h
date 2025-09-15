@@ -16,12 +16,6 @@ struct inner_type<Ptr<T>>
     using type = T;
 };
 
-template <typename T>
-struct inner_type<std::weak_ptr<T>>
-{
-    using type = T;
-};
-
 // Object Ptr<Object>
 // type: Object
 template <typename T, bool isobject = is_object<typename inner_type<remove_cr<T>>::type>>

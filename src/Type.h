@@ -117,7 +117,7 @@ public:
     template <typename T = Object, typename... Args>
     Ptr<T> Create(Args&&... args) const
     {
-        return std::static_pointer_cast<T>(CreateInstance({cast<ObjectPtr>(args)...}));
+        return RTTI_PTR_CAST(T, CreateInstance({cast<ObjectPtr>(args)...}));
     }
 
     // 获取类型的构造函数
@@ -227,10 +227,10 @@ inline auto cast(const From& from, bool* pOK)
 
     if constexpr (is_object<TFrom>)
     {
-        static_assert(std::is_same_v<TFrom*, From> || std::is_same_v<Ptr<TFrom>, From> || std::is_same_v<std::weak_ptr<TFrom>, From>);
+        static_assert(std::is_same_v<TFrom*, From> || std::is_same_v<Ptr<TFrom>, From>);
         if constexpr (is_object<TTo>)
         {
-            static_assert(std::is_same_v<TTo, To> || std::is_same_v<TTo*, To> || std::is_same_v<Ptr<TTo>, To> || std::is_same_v<std::weak_ptr<TTo>, To>);
+            static_assert(std::is_same_v<TTo, To> || std::is_same_v<TTo*, To> || std::is_same_v<Ptr<TTo>, To>);
 
             // if constexpr (std::is_same_v<TFrom, TTo> || std::is_convertible_v<TFrom, TTo>)
             //{
@@ -244,18 +244,9 @@ inline auto cast(const From& from, bool* pOK)
             //     {
             //        static_assert(!std::is_same_v<TTo*, To>);
             //
-            //        if constexpr (std::is_same_v<std::weak_ptr<TFrom>, From>)
-            //        {
-            //            if constexpr (std::is_same_v<TTo, To> || std::is_same_v<Ptr<TTo>, To>) // WPtr<Subclass> --> Base / SPtr<Base>
-            //                RETURN(To(from.lock()), true)
-            //            else if constexpr (std::is_same_v<std::weak_ptr<TTo>, To>) // WPtr<Subclass> --> WPtr<Base>
-            //                RETURN(To(from), true)
-            //        }
-            //        else if constexpr (std::is_same_v<Ptr<TFrom>, From>)
+            //        if constexpr (std::is_same_v<Ptr<TFrom>, From>)
             //        {
             //            if constexpr (std::is_same_v<TTo, To> || std::is_same_v<Ptr<TTo>, To>) // SPtr<Subclass> --> Base / SPtr<Base>
-            //                RETURN(To(from), true)
-            //            else if constexpr (std::is_same_v<std::weak_ptr<TTo>, To>) // SPtr<Subclass> --> WPtr<Base>
             //                RETURN(To(from), true)
             //        }
             //    }
@@ -277,22 +268,13 @@ inline auto cast(const From& from, bool* pOK)
                 {
                     static_assert(!std::is_same_v<TTo*, To>);
 
-                    if constexpr (std::is_same_v<std::weak_ptr<TFrom>, From>)
-                    {
-                        // WPtr<Base> --> Subclass / SPtr<Subclass> / WPtr<Subclass>
-                        auto obj = cast<Ptr<TTo>>(from.lock(), pOK);
-                        if constexpr (std::is_same_v<std::weak_ptr<TTo>, To>)
-                            RETURN(std::weak_ptr<TTo>(obj), true)
-                        else
-                            RETURN(obj, true)
-                    }
-                    else if constexpr (std::is_same_v<Ptr<TFrom>, From>)
+                    if constexpr (std::is_same_v<Ptr<TFrom>, From>)
                     {
                         if (from != nullptr)
                         {
                             ObjectPtr target = nullptr;
                             if (Type::Convert(from, type_of<TTo>(), target))
-                                RETURN(std::static_pointer_cast<TTo>(target), true)
+                                RETURN(RTTI_PTR_CAST(TTo, target), true)
                             else
                                 RETURN(Ptr<TTo>(nullptr), false)
                         }
@@ -343,7 +325,7 @@ inline auto cast(const From& from, bool* pOK)
 
             ObjectPtr target = nullptr;
             if (Type::Convert(Box(from), type_of<TTo>(), target))
-                RETURN(std::static_pointer_cast<TTo>(target), true)
+                RETURN(RTTI_PTR_CAST(TTo, target), true)
 
             RETURN(Ptr<TTo>(nullptr), false)
         }

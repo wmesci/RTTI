@@ -16,13 +16,13 @@
 namespace rtti
 {
 template <typename T>
-struct PtrTraits
-{
-    using type = std::shared_ptr<T>;
-};
+using Ptr = RTTI_PTR(T);
 
-template <typename T>
-using Ptr = typename PtrTraits<T>::type;
+template <typename T, typename... Args>
+inline Ptr<T> MakePtr(Args&&... args)
+{
+    return RTTI_MAKE_PTR(T, std::forward<Args>(args)...);
+}
 
 class Object;
 using ObjectPtr = Ptr<Object>;

@@ -19,17 +19,19 @@ size_t Object::GetHashCode() const
     return std::hash<const void*>()(this);
 }
 
-Ptr<Object> Object::Clone() const
+Ptr<Object> Object::Clone()
 {
     auto type = this->GetRttiType();
     if (!type->HasAttribute(ClonableAttribute))
         return nullptr;
 
-    auto self = std::const_pointer_cast<Object>(this->shared_from_this());
+#ifdef RTTI_PTR_FROM_RAW
+    auto self = RTTI_PTR_FROM_RAW(this);
 
     auto ctor = type->GetConstructor({type});
     if (ctor != nullptr)
         return ctor->Invoke({self});
+#endif
 
     auto obj = type->CreateInstance({});
     if (obj == nullptr)

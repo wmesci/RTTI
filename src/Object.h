@@ -13,7 +13,7 @@ enum class CloneOption
 constexpr size_t CloneOptionAttribute = HASH("CloneOptionAttribute");
 constexpr size_t ClonableAttribute = HASH("ClonableAttribute");
 
-class Object : public std::enable_shared_from_this<Object>
+RTTI_OBJECT_DEFINE
 {
 private:
     Object(const Object&) = delete;
@@ -27,7 +27,7 @@ public:
 
     virtual Type* GetRttiType() const;
 
-    virtual Ptr<Object> Clone() const;
+    virtual Ptr<Object> Clone();
 
     virtual ~Object();
 

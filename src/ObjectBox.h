@@ -36,7 +36,7 @@ public:
             return Object::GetHashCode();
     }
 
-    Ptr<Object> Clone() const override
+    Ptr<Object> Clone() override
     {
         if constexpr (std::is_copy_constructible<T>::value)
         {
