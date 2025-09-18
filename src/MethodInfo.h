@@ -179,7 +179,7 @@ public:
                         RTTI_ERROR((std::string("target must be ") + GetTypeName<SelfType>()).c_str());
                         return nullptr;
                     }
-                    self = static_cast<SelfType*>(target.get());
+                    self = static_cast<SelfType*>(RTTI_RAW_FROM_PTR(target));
                 }
                 else
                 {

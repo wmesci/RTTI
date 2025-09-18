@@ -62,13 +62,6 @@ using base_type_t = TypeWarper<T>::base;
 template <typename T>
 Type* type_of();
 
-struct EnumInfo
-{
-    int64_t number;
-    ObjectPtr value;
-    std::string name;
-};
-
 struct ParameterInfo
 {
     Type* ParameterType;

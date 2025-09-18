@@ -64,7 +64,7 @@ public:
 template <ValueType T>
 inline ObjectPtr Box(T value)
 {
-    return std::make_shared<Boxed<T>>(value);
+    return rtti::MakePtr<Boxed<T>>(value);
 }
 
 //  Unbox<int>(...)   int   int&   int*
@@ -76,7 +76,7 @@ inline T Unbox(const ObjectPtr& ptr)
     // assert(ptr != nullptr && ptr->GetRttiType()->IsBoxedType());
     assert(ptr != nullptr);
 
-    auto objbox = static_cast<ObjectBox*>(ptr.get());
+    auto objbox = static_cast<ObjectBox*>(RTTI_RAW_FROM_PTR(ptr));
 
     if constexpr (std::is_pointer_v<T>)
     {

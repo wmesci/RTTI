@@ -67,7 +67,6 @@ public:
             .method("BaseFunc3"s, &TestBase::BaseFunc3)
             .method("BaseFunc4"s, &TestBase::BaseFunc4)
             .method("BaseFunc5"s, &TestBase::BaseFunc5)
-            //.method("BaseFunc6"s, &TestBase::BaseFunc6)
             .method("BaseFunc7"s, &TestBase::BaseFunc7);
     }
 
@@ -95,22 +94,16 @@ public:
         return 34;
     }
 
-    std::shared_ptr<TestBase> BaseFunc4() const
+    rtti::Ptr<TestBase> BaseFunc4() const
     {
         printf("ObjectPtr BaseFunc4() const\n");
-        return std::make_shared<TestBase>();
+        return rtti::MakePtr<TestBase>();
     }
 
     void BaseFunc5(int a)
     {
         printf("void BaseFunc5(int %d)\n", a);
     }
-
-    // void BaseFunc6(int& a)
-    //{
-    //     printf("void BaseFunc6(int& %d)\n", a);
-    //     a = 31415926;
-    // }
 
     void BaseFunc7(const rtti::ObjectPtr& a) const
     {
@@ -142,7 +135,6 @@ public:
             .method("Func3"s, &Test::Func3)
             .method("Func4"s, &Test::Func4)
             .method("Func5"s, &Test::Func5)
-            .method("Func6"s, &Test::Func6)
             .method("Func7"s, &Test::Func7)
             .method("Func8"s, &Test::Func8);
     }
@@ -200,7 +192,7 @@ public:
     rtti::ObjectPtr Func4() const
     {
         printf("ObjectPtr Func4() const\n");
-        return std::make_shared<Test>();
+        return rtti::MakePtr<Test>();
     }
 
     void Func5(int a)
@@ -208,12 +200,7 @@ public:
         printf("void Func5(int %d)\n", a);
     }
 
-    void Func6(const std::shared_ptr<int>& a)
-    {
-        printf("void Func6(const std::shared_ptr<int>& %d)\n", *a);
-    }
-
-    void Func7(const std::shared_ptr<TestBase>& a) const
+    void Func7(const rtti::Ptr<TestBase>& a) const
     {
         printf("void Func7(const ObjectPtr& [%s]) const\n", a->GetRttiType()->GetName().c_str());
     }
@@ -227,7 +214,7 @@ public:
     bool ConvertTo(T& target);
 
     template <typename T>
-    bool ConvertTo(std::shared_ptr<T>& target);
+    bool ConvertTo(rtti::Ptr<T>& target);
 };
 
 template <>
@@ -262,7 +249,7 @@ struct Handle : public HandleBase
 public:
     Handle() = default;
 
-    Handle(const std::shared_ptr<T>& p)
+    Handle(const rtti::Ptr<T>& p)
         : HandleBase(p)
     {
     }
@@ -275,18 +262,18 @@ public:
 
     T* operator->() const
     {
-        return static_cast<T*>(m_ptr.get());
+        return static_cast<T*>(RTTI_RAW_FROM_PTR(m_ptr));
     }
 
-    operator std::shared_ptr<T>() const
+    operator rtti::Ptr<T>() const
     {
-        return std::static_pointer_cast<T>(m_ptr);
+        return RTTI_PTR_CAST(T, m_ptr);
     }
 
     static void RegisterRTTI()
     {
         rtti::TypeRegister<Handle<T>>::New("Handle<"s + rtti::GetTypeName<T>() + ">"s, {{HASH("handle"), rtti::type_of<T>()}})
-            .template constructor<std::shared_ptr<T>>()
+            .template constructor<rtti::Ptr<T>>()
             .template convert<HandleBase>()
             .template convert<T>();
     }
@@ -299,7 +286,7 @@ void print(rtti::MethodBase* m)
     else if (m->ReturnType()->IsValueType())
         printf("%s ", m->ReturnType()->GetName().c_str());
     else
-        printf("std::shared_ptr<%s> ", m->ReturnType()->GetName().c_str());
+        printf("rtti::Ptr<%s> ", m->ReturnType()->GetName().c_str());
 
     printf("%s(", m->GetName().c_str());
     for (size_t i = 0; i < m->GetParameters().size(); i++)
@@ -311,7 +298,7 @@ void print(rtti::MethodBase* m)
         if (p.ParameterType->IsValueType())
             printf("%s", p.ParameterType->GetName().c_str());
         else
-            printf("std::shared_ptr<%s>", p.ParameterType->GetName().c_str());
+            printf("rtti::Ptr<%s>", p.ParameterType->GetName().c_str());
 
         if (p.IsRef)
             printf("&");
@@ -347,10 +334,10 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char* argv[])
     assert(rtti::type_of<TestEnum2>()->IsEnum());
     assert(rtti::type_of<TestEnum2>()->CanConvertTo<int32_t>());
 
-    assert(rtti::type_of<Test>() == rtti::type_of<std::shared_ptr<Test>>());
+    assert(rtti::type_of<Test>() == rtti::type_of<rtti::Ptr<Test>>());
     assert(rtti::type_of<Test>()->CanConvertTo<int32_t>());
 
-    Handle<TestBase> ht = Handle<Test>(std::make_shared<Test>());
+    Handle<TestBase> ht = Handle<Test>(rtti::MakePtr<Test>());
 
     assert(ht->GetRttiType() == rtti::type_of<Test>());
 
@@ -373,9 +360,9 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char* argv[])
     auto obj1 = type->Create<Test>(123);
     auto obj2 = type->Create<Test>(123, 789.12f);
 
-    assert(rtti::cast<void*>(obj) == obj.get());
-    assert(rtti::cast<Test>((TestBase*)obj.get()) == obj.get());
-    assert(rtti::cast<Test*>((TestBase*)obj.get()) == obj.get());
+    assert(rtti::cast<void*>(obj) == RTTI_RAW_FROM_PTR(obj));
+    assert(rtti::cast<Test>((TestBase*)RTTI_RAW_FROM_PTR(obj)) == RTTI_RAW_FROM_PTR(obj));
+    assert(rtti::cast<Test*>((TestBase*)RTTI_RAW_FROM_PTR(obj)) == RTTI_RAW_FROM_PTR(obj));
 
     rtti::ObjectPtr ttt;
     rtti::Type::Convert(obj, rtti::type_of<int>(), ttt);
@@ -438,7 +425,7 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char* argv[])
         if (p->PropertyType()->IsValueType())
             printf("%s %s", p->PropertyType()->GetName().c_str(), p->GetName().c_str());
         else
-            printf("std::shared_ptr<%s> %s", p->PropertyType()->GetName().c_str(), p->GetName().c_str());
+            printf("rtti::Ptr<%s> %s", p->PropertyType()->GetName().c_str(), p->GetName().c_str());
         printf("\n");
     }
 
@@ -451,8 +438,7 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char* argv[])
     printf("  ret = %s\n", type->GetMethod("Func4"s)->Invoke(obj, {})->GetRttiType()->GetName().c_str());
     type->GetMethod("Func5"s, {rtti::type_of<int>()})->Invoke(obj, {rtti::Box(TestEnum::Value1)});
     type->GetMethod("Func5"s, {rtti::type_of<int>()})->Invoke(obj, {rtti::Box(TestStruct())});
-    type->GetMethod("Func5"s, {rtti::type_of<int>()})->Invoke(obj, {std::make_shared<Test>()});
-    type->GetMethod("Func6"s, {rtti::type_of<std::shared_ptr<int>>()})->Invoke(obj, {rtti::Box(std::make_shared<int>(135))});
+    type->GetMethod("Func5"s, {rtti::type_of<int>()})->Invoke(obj, {rtti::MakePtr<Test>()});
     type->GetMethod("Func7"s, {rtti::type_of<TestBase>()})->Invoke(obj, {obj});
     type->GetMethod("Func8"s, {rtti::type_of<TestEnum>()})->Invoke(obj, {rtti::Box(123)});
 

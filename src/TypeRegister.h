@@ -247,7 +247,7 @@ public:
 
     TypeRegister<T>& value(const std::string& name, T v)
     {
-        type_of<T>()->m_enumValues.push_back({(int64_t)v, Box(v), name});
+        type_of<T>()->m_enumValues[name] = Box(v);
         return *this;
     }
 

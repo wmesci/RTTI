@@ -111,35 +111,33 @@ public:
         return ((int)m_flags & (int)flag) != 0;
     }
 
-    const std::vector<EnumInfo>& GetEnumInfos() const
+    const std::map<std::string, ObjectPtr>& GetEnumInfos() const
     {
         return m_enumValues;
     }
 
-    bool GetEnumInfo(const int64_t& number, EnumInfo* pInfo) const
+    std::string GetEnumName(const ObjectPtr& value) const
     {
         for (auto&& i : m_enumValues)
         {
-            if (i.number == number)
+            if (Compare(i.second, value) == CompareResult::Equals)
             {
-                *pInfo = i;
-                return true;
+                return i.first;
             }
         }
-        return false;
+        return std::string();
     }
 
-    bool GetEnumInfo(const std::string& name, EnumInfo* pInfo) const
+    ObjectPtr GetEnumValue(const std::string& name) const
     {
         for (auto&& i : m_enumValues)
         {
-            if (i.name == name)
+            if (i.first == name)
             {
-                *pInfo = i;
-                return true;
+                return i.second;
             }
         }
-        return false;
+        return nullptr;
     }
 
     bool IsAssignableFrom(Type* type) const
@@ -619,7 +617,7 @@ protected:
     std::vector<PropertyInfo*> m_properties;
     std::vector<TypeConvertor> m_typeConvertors;
     std::vector<ObjectComparer> m_objectComparers;
-    std::vector<EnumInfo> m_enumValues;
+    std::map<std::string, ObjectPtr> m_enumValues;
     Type* next;
 
     static Type* header;
@@ -747,7 +745,7 @@ inline auto cast(const From& from, bool* pOK)
         else if constexpr (std::is_same_v<void*, remove_cr<To>>)
         {
             // Ptr -> void*
-            RETURN(from.get(), true)
+            RETURN(RTTI_RAW_FROM_PTR(from), true)
         }
         else
         {
