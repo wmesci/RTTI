@@ -1,18 +1,9 @@
 ﻿#pragma once
 #include "System.h"
+#include "Reflection.h"
 
 namespace rtti
 {
-enum class CloneOption
-{
-    None,
-    Shallow,
-    Deep
-};
-
-constexpr size_t CloneOptionAttribute = HASH("CloneOptionAttribute");
-constexpr size_t ClonableAttribute = HASH("ClonableAttribute");
-
 RTTI_OBJECT_DEFINE
 {
 private:
@@ -21,15 +12,19 @@ private:
     Object& operator=(const Object&) = delete;
 
 public:
-    Object();
+    Object() = default;
 
-    virtual size_t GetHashCode() const;
+    virtual size_t GetHashCode() const
+    {
+        return std::hash<const void*>()(this);
+    }
 
-    virtual Type* GetRttiType() const;
+    virtual Type* GetRttiType() const
+    {
+        return CreateType<Object, void>();
+    }
 
-    virtual Ptr<Object> Clone();
-
-    virtual ~Object();
+    virtual ~Object() = default;
 
 public:
     using BASE_TYPE = void;

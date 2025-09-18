@@ -36,18 +36,6 @@ public:
             return Object::GetHashCode();
     }
 
-    Ptr<Object> Clone() override
-    {
-        if constexpr (std::is_copy_constructible<T>::value)
-        {
-            return std::make_shared<Boxed<T>>(object);
-        }
-        else
-        {
-            return nullptr;
-        }
-    }
-
 private:
     T object;
 

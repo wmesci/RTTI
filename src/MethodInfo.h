@@ -176,7 +176,7 @@ public:
                 {
                     if (!type_of<SelfType>()->IsAssignableFrom(target))
                     {
-                        RTTI_ERROR((std::string("target must be ") + type_of<SelfType>()->GetName() + std::string(", but is actually ") + target_type->GetName()).c_str());
+                        RTTI_ERROR((std::string("target must be ") + GetTypeName<SelfType>()).c_str());
                         return nullptr;
                     }
                     self = static_cast<SelfType*>(target.get());
@@ -185,7 +185,7 @@ public:
                 {
                     if (type_of<SelfType>() != target_type && type_of<SelfType*>() != target_type)
                     {
-                        RTTI_ERROR((std::string("target must be ") + type_of<SelfType>()->GetName() + std::string(", but is actually ") + target_type->GetName()).c_str());
+                        RTTI_ERROR((std::string("target must be ") + GetTypeName<SelfType>()).c_str());
                         return nullptr;
                     }
                     self = Unbox<SelfType*>(target);

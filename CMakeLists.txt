@@ -14,28 +14,24 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 # 设置库名称
 set(RTTI_LIBRARY_NAME rtti)
 
-# 使用GLOB_RECURSE搜集源文件和头文件
-file(GLOB_RECURSE RTTI_SOURCES
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/*.cpp"
-)
-
+# 使用GLOB_RECURSE搜集头文件
 file(GLOB_RECURSE RTTI_HEADERS
     "${CMAKE_CURRENT_SOURCE_DIR}/src/*.h"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/*.hpp"
 )
 
-# 创建静态库
-add_library(${RTTI_LIBRARY_NAME} STATIC ${RTTI_SOURCES} ${RTTI_HEADERS})
+# 创建接口库
+add_library(${RTTI_LIBRARY_NAME} INTERFACE)
 
 # 设置库的公共头文件目录
 target_include_directories(${RTTI_LIBRARY_NAME}
-    PUBLIC
+    INTERFACE
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>
         $<INSTALL_INTERFACE:include/RTTI>
 )
 
 # 设置C++标准
-target_compile_features(${RTTI_LIBRARY_NAME} PUBLIC cxx_std_17)
+target_compile_features(${RTTI_LIBRARY_NAME} INTERFACE cxx_std_20)
 
 # 创建别名目标，方便外部项目引用
 add_library(rtti::rtti ALIAS ${RTTI_LIBRARY_NAME})
