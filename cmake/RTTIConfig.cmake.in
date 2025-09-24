@@ -1,0 +1,8 @@
+# RTTIConfig.cmake.in
+# CMake configuration file for RTTI
+
+@PACKAGE_INIT@
+
+include("${CMAKE_CURRENT_LIST_DIR}/RTTITargets.cmake")
+
+check_required_components(RTTI)
