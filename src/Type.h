@@ -171,7 +171,7 @@ public:
             return true;
 
         if (IsValueType())
-            return type == type_of<Object>();
+            return type == type_of<Object>() || type == type_of<ObjectBox>();
         else
             return this->IsSubClassOf(type);
     }
