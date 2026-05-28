@@ -52,9 +52,8 @@ private:
         , m_flags(flags)
         , m_baseType(baseType)
         , m_underlyingType(underlyingType)
-        , next(header)
     {
-        header = this;
+        GetRegistry()[name] = this;
     }
 
     ~Type() {}
@@ -262,7 +261,7 @@ public:
     template <typename T = Object, typename... Args>
     Ptr<T> Create(Args&&... args) const
     {
-        return RTTI_PTR_CAST(T, CreateInstance({cast<ObjectPtr>(args)...}));
+        return PtrCast<T>(CreateInstance({cast<ObjectPtr>(args)...}));
     }
 
     // 获取类型的构造函数
@@ -561,6 +560,12 @@ public:
 
         Type* leftType = left->GetRttiType();
         Type* rightType = right != nullptr ? right->GetRttiType() : nullptr;
+
+        // Canonical ordering: ensure Compare(A,B) and Compare(B,A) use the
+        // same comparer.  std::less provides a total order over all pointers.
+        if (rightType != nullptr && std::less<Type*>{}(rightType, leftType))
+            return Type::Compare(right, left);
+
         for (auto&& i : leftType->m_objectComparers)
         {
             if ((i.TargetType == nullptr && rightType == nullptr) || (i.TargetType != nullptr && rightType != nullptr && rightType->IsAssignableTo(i.TargetType)))
@@ -586,24 +591,22 @@ public:
     // 根据名称查找类型
     static Type* Find(const std::string& name)
     {
-        Type* cur = header;
-        while (cur != nullptr)
-        {
-            if (name == cur->GetName())
-                return cur;
-            cur = cur->next;
-        }
-        return nullptr;
+        auto& registry = GetRegistry();
+        auto it = registry.find(name);
+        return it != registry.end() ? it->second : nullptr;
     }
 
     static void ForEach(const std::function<void(Type*)>& callback)
     {
-        Type* cur = header;
-        while (cur != nullptr)
-        {
-            callback(cur);
-            cur = cur->next;
-        }
+        for (auto& entry : GetRegistry())
+            callback(entry.second);
+    }
+
+private:
+    static std::map<std::string, Type*>& GetRegistry()
+    {
+        static std::map<std::string, Type*> registry;
+        return registry;
     }
 
 protected:
@@ -618,12 +621,7 @@ protected:
     std::vector<TypeConvertor> m_typeConvertors;
     std::vector<ObjectComparer> m_objectComparers;
     std::map<std::string, ObjectPtr> m_enumValues;
-    Type* next;
-
-    static Type* header;
 };
-
-inline Type* Type::header = nullptr;
 
 inline Type* NewType(const std::string& name, size_t size, TypeFlags flags, Type* underlyingType, Type* base)
 {
@@ -694,7 +692,7 @@ inline auto cast(const From& from, bool* pOK)
             //     {
             //         // Subclass* --> Base / Base*
             //         static_assert(std::is_same_v<TTo, To> || std::is_same_v<TTo*, To>);
-            //         RETURN((TTo*)from, true)
+            //         RETURN(static_cast<TTo*>(from), true)
             //     }
             //     else
             //     {
@@ -716,9 +714,9 @@ inline auto cast(const From& from, bool* pOK)
                     // Base* --> Subclass / Subclass*
                     static_assert(std::is_same_v<TTo, To> || std::is_same_v<TTo*, To>);
                     if (convertible)
-                        RETURN((TTo*)from, true)
+                        RETURN(static_cast<TTo*>(from), true)
                     else
-                        RETURN((TTo*)nullptr, false)
+                        RETURN(static_cast<TTo*>(nullptr), false)
                 }
                 else
                 {
@@ -730,7 +728,7 @@ inline auto cast(const From& from, bool* pOK)
                         {
                             ObjectPtr target = nullptr;
                             if (Type::Convert(from, type_of<TTo>(), target))
-                                RETURN(RTTI_PTR_CAST(TTo, target), true)
+                                RETURN(PtrCast<TTo>(target), true)
                             else
                                 RETURN(Ptr<TTo>(nullptr), false)
                         }
@@ -745,7 +743,7 @@ inline auto cast(const From& from, bool* pOK)
         else if constexpr (std::is_same_v<void*, remove_cr<To>>)
         {
             // Ptr -> void*
-            RETURN(RTTI_RAW_FROM_PTR(from), true)
+            RETURN(RawFromPtr(from), true)
         }
         else
         {
@@ -781,7 +779,7 @@ inline auto cast(const From& from, bool* pOK)
 
             ObjectPtr target = nullptr;
             if (Type::Convert(Box(from), type_of<TTo>(), target))
-                RETURN(RTTI_PTR_CAST(TTo, target), true)
+                RETURN(PtrCast<TTo>(target), true)
 
             RETURN(Ptr<TTo>(nullptr), false)
         }

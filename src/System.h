@@ -15,13 +15,28 @@
 
 namespace rtti
 {
-template <typename T>
-using Ptr = RTTI_PTR(T);
-
 template <typename T, typename... Args>
 inline Ptr<T> MakePtr(Args&&... args)
 {
-    return RTTI_MAKE_PTR(T, std::forward<Args>(args)...);
+    return detail::pointer_ops<T>::template make<T>(std::forward<Args>(args)...);
+}
+
+template <typename To, typename From>
+inline auto PtrCast(const Ptr<From>& p)
+{
+    return detail::pointer_ops<From>::template ptr_cast<To>(p);
+}
+
+template <typename T>
+inline T* RawFromPtr(const Ptr<T>& p) noexcept
+{
+    return detail::pointer_ops<T>::to_raw(p);
+}
+
+template <typename T>
+inline Ptr<T> PtrFromRaw(T* raw)
+{
+    return detail::pointer_ops<T>::from_raw(raw);
 }
 
 class Object;
@@ -60,12 +75,12 @@ constexpr size_t hash_string(const char* str, size_t size = 0)
     if (size == 0) {
         while (*str != '\0')
         {
-            hash_combine(hash, size_t(*str));
+            hash_combine(hash, static_cast<size_t>(static_cast<unsigned char>(*str)));
             str++;
         }
     } else {
         for (size_t i = 0; i < size; i++) {
-            hash_combine(hash, size_t(str[i]));
+            hash_combine(hash, static_cast<size_t>(static_cast<unsigned char>(str[i])));
         }
     }
     return hash;
@@ -80,7 +95,7 @@ template <typename T>
 using remove_cr = std::remove_const_t<std::remove_reference_t<T>>;
 
 template <typename T>
-constexpr bool is_object = std::is_base_of<Object, T>::value || std::is_same<Object, T>::value;
+constexpr bool is_object = std::is_base_of<Object, T>::value;  // is_base_of<T,T> is true
 
 template <typename T>
 concept ObjectType = is_object<T>;

@@ -62,7 +62,14 @@ public:
     static TypeRegister<T> New(const std::string& name, const std::map<size_t, std::any>& attributes = {})
     {
         Type* type = type_of<T>();
+        // Update registry key when the display name differs from the
+        // compile-time type name used during Type construction.
+        auto& registry = Type::GetRegistry();
+        auto it = registry.find(type->m_name);
+        if (it != registry.end() && it->second == type)
+            registry.erase(it);
         type->m_name = name;
+        registry[name] = type;
         type->m_attributes = attributes;
 
         TypeRegister<T> reg;
@@ -228,7 +235,9 @@ public:
         type->m_attributes = attributes;
 
         TypeRegister<T> reg;
-        type->m_constructors.push_back(ConstructorInfo::Register<T>(&ctor<T, const T&>));
+        // Skip if DefaultEnumRegister already registered constructors (avoids duplicate)
+        if (type->m_constructors.empty())
+            type->m_constructors.push_back(ConstructorInfo::Register<T>(&ctor<T, const T&>));
 
         return reg;
     }
@@ -236,11 +245,19 @@ public:
     static TypeRegister<T> New(const std::string& name, const std::map<size_t, std::any>& attributes = {})
     {
         Type* type = type_of<T>();
+        // Update registry key when the display name differs from the
+        // compile-time type name used during Type construction.
+        auto& registry = Type::GetRegistry();
+        auto it = registry.find(type->m_name);
+        if (it != registry.end() && it->second == type)
+            registry.erase(it);
         type->m_name = name;
+        registry[name] = type;
         type->m_attributes = attributes;
 
         TypeRegister<T> reg;
-        type->m_constructors.push_back(ConstructorInfo::Register<T>(&ctor<T, const T&>));
+        if (type->m_constructors.empty())
+            type->m_constructors.push_back(ConstructorInfo::Register<T>(&ctor<T, const T&>));
 
         return reg;
     }

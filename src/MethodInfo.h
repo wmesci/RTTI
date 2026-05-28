@@ -9,7 +9,11 @@ namespace
 template <typename Tuple, typename Iterator, std::size_t... I>
 static Tuple MakeArgsImpl(const Iterator& p, std::index_sequence<I...>)
 {
-    return Tuple(rtti::cast<std::tuple_element_t<I, Tuple>>(p[I])...);
+    bool ok = true;
+    Tuple result{rtti::cast<std::tuple_element_t<I, Tuple>>(p[I], &ok)...};
+    if (!ok)
+        RTTI_WARNING("argument conversion failed in MakeArgs");
+    return result;
 }
 
 // Convert each ObjectPtr in the Iterator to the type corresponding to Args and place it in a tuple.
@@ -207,7 +211,7 @@ public:
                         RTTI_ERROR((std::string("target must be ") + GetTypeName<SelfType>()).c_str());
                         return nullptr;
                     }
-                    self = static_cast<SelfType*>(RTTI_RAW_FROM_PTR(target));
+                    self = static_cast<SelfType*>(RawFromPtr(target));
                 }
                 else
                 {

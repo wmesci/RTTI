@@ -283,7 +283,7 @@ inline void InitCoreType()
         .compare<float>()
         .compare<double>();
 
-    TypeRegister<unsigned long>::New("ulong")
+    TypeRegister<unsigned long>::New("unsigned long")
         .constructor<>()
         .constructor<unsigned long>()
         .convert<int8_t>()

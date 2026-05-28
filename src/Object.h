@@ -4,7 +4,7 @@
 
 namespace rtti
 {
-RTTI_OBJECT_DEFINE
+class Object : public detail::object_base<Object>::type
 {
 private:
     Object(const Object&) = delete;

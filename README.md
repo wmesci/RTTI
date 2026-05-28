@@ -210,44 +210,62 @@ obj->GetRttiType() == rtti::type_of<MyClass>();
 
 RTTI 支持自定义基类和智能指针类型，以适应不同的项目需求。
 
-### 自定义 Object 基类
-
-默认情况下，RTTI 使用 [std::enable_shared_from_this](https://en.cppreference.com/w/cpp/memory/enable_shared_from_this) 作为基类。如果需要自定义基类，可以通过定义 `RTTI_OBJECT_DEFINE` 宏来实现：
-
-```cpp
-// 在包含 RTTI 头文件之前定义
-#define RTTI_OBJECT_DEFINE() class Object : public CustomBaseClass
-
-#include <RTTI/RTTI.h>
-#include <RTTI/Object.h>
-```
-
 ### 自定义智能指针类型
 
-RTTI 默认使用 [std::shared_ptr](https://en.cppreference.com/w/cpp/memory/shared_ptr) 作为智能指针类型。如果需要使用其他智能指针类型（如 [std::unique_ptr](https://en.cppreference.com/w/cpp/memory/unique_ptr) 或自定义智能指针），可以通过定义 `RTTI_PTR_TYPE` 宏来实现：
+RTTI 默认使用 `std::shared_ptr<T>` 作为智能指针类型。如需全局替换（如使用 `IntrusivePtr`），在包含任何 RTTI 头文件**之前**定义 `RTTI_PTR_ALIAS` 宏，并为你的类型特化 `pointer_ops`：
 
 ```cpp
-// 在包含 RTTI 头文件之前定义
-#define RTTI_PTR_TYPE(T) std::unique_ptr<T>
+// 1. 定义指针类型别名
+#define RTTI_PTR_ALIAS(T) my::IntrusivePtr<T>
 
+// 2. 为你的智能指针提供操作特化
+namespace rtti::detail {
+template <typename T>
+struct pointer_ops<T> {
+    template <typename U = T, typename... Args>
+    static rtti::Ptr<U> make(Args&&... args) {
+        return my::MakeIntrusive<U>(std::forward<Args>(args)...);
+    }
+
+    template <typename U>
+    static rtti::Ptr<U> ptr_cast(const rtti::Ptr<T>& p) {
+        return my::static_pointer_cast<U>(p);
+    }
+
+    static T* to_raw(const rtti::Ptr<T>& p) noexcept { return p.get(); }
+    static rtti::Ptr<T> from_raw(T* raw) { return rtti::Ptr<T>(raw); }
+};
+} // namespace rtti::detail
+
+// 3. 现在包含 RTTI 头文件
 #include <RTTI/RTTI.h>
-#include <RTTI/Object.h>
 ```
 
-注意：自定义智能指针类型需要支持以下操作：
+### 自定义 Object 基类
 
-1. 默认构造函数
-2. 拷贝构造函数或移动构造函数
-3. 拷贝赋值操作符或移动赋值操作符
-4. [operator-&gt;](https://en.cppreference.com/w/cpp/memory/shared_ptr/operator*) 访问成员
-5. [operator bool](https://en.cppreference.com/w/cpp/memory/shared_ptr/operator_bool) 检查有效性
+默认情况下，RTTI 使用 `std::enable_shared_from_this<T>` 作为 Object 的基类。如需自定义，在包含 RTTI 头文件之前特化 `object_base`：
 
-如果使用自定义智能指针，可能还需要定义其他宏以支持相关操作：
+```cpp
+namespace rtti::detail {
+template <>
+struct object_base<rtti::Object> {
+    using type = MyCustomBase;  // 替换 enable_shared_from_this
+};
+} // namespace rtti::detail
 
-- `RTTI_MAKE_PTR(T, ...)` 用于创建智能指针实例
-- `RTTI_PTR_CAST(T, p)` 用于智能指针类型转换
-- `RTTI_PTR_FROM_RAW` 用于通过原始指针获取智能指针（如不支持可以不定义）
-- `RTTI_RAW_FROM_PTR` 用于通过智能指针获取原始指针
+#include <RTTI/RTTI.h>
+```
+
+### 自定义指针的操作要求
+
+自定义智能指针类型需要支持以下操作（在 `pointer_ops` 特化中实现）：
+
+- `make<U>(args...)` — 创建智能指针实例
+- `ptr_cast<U>(p)` — 智能指针类型转换（如 `static_pointer_cast`）
+- `to_raw(p)` — 从智能指针获取原始指针
+- `from_raw(raw)` — 从原始指针获取智能指针（注意生命周期）
+
+> **注意**：所有翻译单元中的自定义特化必须保持一致，否则会导致 ODR 违规（程序 ill-formed, no diagnostic required）。类型注册（`type_of<T>()`、`TypeRegister::New()`）应在单线程启动阶段完成。
 
 ## 最佳实践
 

@@ -155,7 +155,7 @@ inline Type* type_of()
 #define TYPE_DECLARE(...)                                                                           \
 public:                                                                                             \
     using BASE_TYPE = __VA_ARGS__;                                                                  \
-    static_assert(std::is_base_of_v<rtti::Object, BASE_TYPE> || std::is_same_v<BASE_TYPE, Object>); \
+    static_assert(std::is_base_of_v<rtti::Object, BASE_TYPE>);  /* is_base_of<T,T> is true */ \
     virtual rtti::Type* GetRttiType() const override                                                \
     {                                                                                               \
         using THIS_TYPE = rtti::remove_cr<decltype(*this)>;                                         \

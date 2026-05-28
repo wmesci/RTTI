@@ -39,27 +39,20 @@ add_library(rtti::rtti ALIAS ${RTTI_LIBRARY_NAME})
 # 添加构建测试的选项，默认关闭
 option(BUILD_RTTI_TESTS "Build RTTI tests" OFF)
 
-# 如果启用测试构建
 if(BUILD_RTTI_TESTS)
-    # 启用测试
     enable_testing()
-    
-    # 添加测试可执行文件
+
     add_executable(rtti_test tests/test.cpp)
-    
+
     if(MSVC)
         target_compile_options(rtti_test PRIVATE /W4 /WX)
     else()
         target_compile_options(rtti_test PRIVATE -Wall -Wextra -Werror)
     endif()
 
-    # 链接RTTI库
     target_link_libraries(rtti_test PRIVATE ${RTTI_LIBRARY_NAME})
-    
-    # 设置测试可执行文件的包含目录
     target_include_directories(rtti_test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
-    
-    # 添加测试
+
     add_test(NAME RTTI_Test COMMAND rtti_test)
 endif()
 

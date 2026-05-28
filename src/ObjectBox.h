@@ -45,6 +45,11 @@ public:
     {
     }
 
+    Boxed(T&& _object)
+        : object(std::move(_object))
+    {
+    }
+
     T& Unbox()
     {
         return object;
@@ -64,7 +69,9 @@ public:
 template <ValueType T>
 inline ObjectPtr Box(T value)
 {
-    return rtti::MakePtr<Boxed<T>>(value);
+    // std::move: value is an lvalue parameter — move into Boxed to
+    // avoid a redundant copy when the caller passes a temporary.
+    return rtti::MakePtr<Boxed<T>>(std::move(value));
 }
 
 //  Unbox<int>(...)   int   int&   int*
@@ -76,7 +83,7 @@ inline T Unbox(const ObjectPtr& ptr)
     // assert(ptr != nullptr && ptr->GetRttiType()->IsBoxedType());
     assert(ptr != nullptr);
 
-    auto objbox = static_cast<ObjectBox*>(RTTI_RAW_FROM_PTR(ptr));
+    auto objbox = static_cast<ObjectBox*>(RawFromPtr(ptr));
 
     if constexpr (std::is_pointer_v<T>)
     {
