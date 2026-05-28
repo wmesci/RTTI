@@ -33,6 +33,30 @@ static rtti::ParameterInfo GetParameterInfo()
 
 namespace rtti
 {
+
+namespace detail
+{
+// Detect captureless (stateless) lambdas: only captureless lambdas are
+// implicitly convertible to a function pointer, which the unary + operator
+// triggers.  Lambdas with captures (value or reference) will SFINAE out.
+template <typename T, typename = void>
+struct is_stateless_lambda : std::false_type
+{
+};
+
+template <typename T>
+struct is_stateless_lambda<T, std::void_t<decltype(+std::declval<T>())>> : std::true_type
+{
+};
+
+template <typename FUNC>
+constexpr bool is_allowed_method_callable_v =
+    std::is_function_v<std::remove_pointer_t<FUNC>> ||     // function pointer
+    std::is_member_function_pointer_v<FUNC> ||              // member function pointer
+    std::is_member_object_pointer_v<FUNC> ||                // member object pointer
+    is_stateless_lambda<FUNC>::value;                       // captureless lambda
+} // namespace detail
+
 class MethodBase : public Attributable
 {
 private:
@@ -150,6 +174,10 @@ public:
     template <typename Host, typename FUNC, typename RET, typename... Args>
     static MethodInfo* Register(const std::string& name, FUNC f, const std::map<size_t, std::any>& attributes = {})
     {
+        static_assert(detail::is_allowed_method_callable_v<FUNC>,
+                      "Method callable must be a function pointer, member pointer, or a captureless (stateless) lambda. "
+                      "Lambdas with captures (especially reference captures) would dangle when the method is invoked later.");
+
         std::function<ObjectPtr(const ObjectPtr&, const std::vector<ObjectPtr>&)> func = [=](const ObjectPtr& target, const std::vector<ObjectPtr>& args) -> ObjectPtr
         {
             if (args.size() < sizeof...(Args))

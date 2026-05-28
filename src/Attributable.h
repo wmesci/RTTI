@@ -17,6 +17,11 @@ protected:
     }
 
 public:
+    const std::map<size_t, std::any>& GetAttributes() const
+    {
+        return m_attributes;
+    }
+
     bool HasAttribute(size_t id) const
     {
         return m_attributes.find(id) != m_attributes.end();

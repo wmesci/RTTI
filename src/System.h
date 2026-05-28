@@ -41,8 +41,7 @@ class PropertyInfo;
 
 inline constexpr void hash_combine(size_t& seed, size_t hash)
 {
-    hash += 0x9e3779b9 + (seed << 6) + (seed >> 2);
-    seed ^= hash;
+    seed ^= hash + 0x9e3779b9 + (seed << 6) + (seed >> 2);
 }
 
 template <typename... Args>
@@ -53,15 +52,29 @@ inline constexpr size_t hash(const Args&... args)
     return seed;
 }
 
-constexpr size_t HashString(const char* str, size_t seed = 0)
+constexpr size_t hash_string(const char* str, size_t size = 0)
 {
-    return 0 == *str ? seed : HashString(str + 1, seed ^ (*str + 0x9e3779b9 + (seed << 6) + (seed >> 2)));
+    if (!str) return 0;
+
+    size_t hash = 0;
+    if (size == 0) {
+        while (*str != '\0')
+        {
+            hash_combine(hash, size_t(*str));
+            str++;
+        }
+    } else {
+        for (size_t i = 0; i < size; i++) {
+            hash_combine(hash, size_t(str[i]));
+        }
+    }
+    return hash;
 }
 
 template <auto V>
 static constexpr auto force_consteval = V;
 
-#define HASH(str) rtti::force_consteval<rtti::HashString(str)>
+#define HASH(str) rtti::force_consteval<rtti::hash_string(str)>
 
 template <typename T>
 using remove_cr = std::remove_const_t<std::remove_reference_t<T>>;
