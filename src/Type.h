@@ -36,7 +36,9 @@ struct ObjectComparer
 
 class Type : public Attributable
 {
-private:
+public:
+    // Made public for DynamicType registration
+
     template <typename T, bool>
     friend struct TypeRegister;
 
@@ -56,23 +58,25 @@ private:
         GetRegistry()[name] = this;
     }
 
-    ~Type() {}
+public:
+    virtual ~Type() = default;
+
 
 public:
     // 类型名称
-    const std::string& GetName() const { return m_name; }
+    virtual const std::string& GetName() const { return m_name; }
 
     // 类型大小
-    size_t GetSize() const { return m_size; }
+    virtual size_t GetSize() const { return m_size; }
 
     // 获取底层类型
-    Type* GetUnderlyingType() const { return m_underlyingType; }
+    virtual Type* GetUnderlyingType() const { return m_underlyingType; }
 
     // 基类型
-    Type* GetBaseType() const { return m_baseType; }
+    virtual Type* GetBaseType() const { return m_baseType; }
 
     // 当前类型是否是type的子类
-    bool IsSubClassOf(Type* type) const
+    virtual bool IsSubClassOf(Type* type) const
     {
         auto t = this;
         do
@@ -90,32 +94,32 @@ public:
         return IsSubClassOf(type_of<T>());
     }
 
-    bool IsValueType() const
+    virtual bool IsValueType() const
     {
         return GetBaseType() == type_of<ObjectBox>();
     }
 
-    bool IsEnum() const
+    virtual bool IsEnum() const
     {
         return HasFlag(TypeFlags::Enum);
     }
 
-    bool IsPointer() const
+    virtual bool IsPointer() const
     {
         return HasFlag(TypeFlags::Pointer);
     }
 
-    bool HasFlag(TypeFlags flag) const
+    virtual bool HasFlag(TypeFlags flag) const
     {
         return ((int)m_flags & (int)flag) != 0;
     }
 
-    const std::map<std::string, ObjectPtr>& GetEnumInfos() const
+    virtual const std::map<std::string, ObjectPtr>& GetEnumInfos() const
     {
         return m_enumValues;
     }
 
-    std::string GetEnumName(const ObjectPtr& value) const
+    virtual std::string GetEnumName(const ObjectPtr& value) const
     {
         for (auto&& i : m_enumValues)
         {
@@ -127,7 +131,7 @@ public:
         return std::string();
     }
 
-    ObjectPtr GetEnumValue(const std::string& name) const
+    virtual ObjectPtr GetEnumValue(const std::string& name) const
     {
         for (auto&& i : m_enumValues)
         {
@@ -139,7 +143,7 @@ public:
         return nullptr;
     }
 
-    bool IsAssignableFrom(Type* type) const
+    virtual bool IsAssignableFrom(Type* type) const
     {
         if (type == nullptr)
             return false;
@@ -161,7 +165,7 @@ public:
         return IsAssignableFrom(obj->GetRttiType());
     }
 
-    bool IsAssignableTo(Type* type) const
+    virtual bool IsAssignableTo(Type* type) const
     {
         if (type == nullptr)
             return false;
@@ -182,7 +186,7 @@ public:
     }
 
     // 当前类型能否转换为目标类型，只支持单次转换
-    bool CanConvertTo(Type* targetType) const
+    virtual bool CanConvertTo(Type* targetType) const
     {
         Type* sourceType = const_cast<Type*>(this);
 
@@ -220,7 +224,7 @@ public:
     }
 
     // 创建当前类型的实例
-    ObjectPtr CreateInstance(const std::vector<ObjectPtr>& args) const
+    virtual ObjectPtr CreateInstance(const std::vector<ObjectPtr>& args) const
     {
         for (size_t i = 0; i < m_constructors.size(); i++)
         {
@@ -265,13 +269,13 @@ public:
     }
 
     // 获取类型的构造函数
-    const std::vector<ConstructorInfo*>& GetConstructors() const
+    virtual const std::vector<ConstructorInfo*>& GetConstructors() const
     {
         return m_constructors;
     }
 
     // 获取类型的构造函数
-    ConstructorInfo* GetConstructor() const
+    virtual ConstructorInfo* GetConstructor() const
     {
         for (size_t i = 0; i < m_constructors.size(); i++)
         {
@@ -334,7 +338,7 @@ public:
     }
 
     // 遍历类型的方法
-    std::vector<MethodInfo*> GetMethods() const
+    virtual std::vector<MethodInfo*> GetMethods() const
     {
         std::vector<MethodInfo*> methods;
         const Type* curType = this;
@@ -347,7 +351,7 @@ public:
     }
 
     // 获取类型的方法
-    MethodInfo* GetMethod(const std::string& name) const
+    virtual MethodInfo* GetMethod(const std::string& name) const
     {
         auto curType = this;
         while (curType != nullptr)
@@ -365,7 +369,7 @@ public:
         return nullptr;
     }
 
-    MethodInfo* GetMethod(const std::string& name, std::initializer_list<Type*> args) const
+    virtual MethodInfo* GetMethod(const std::string& name, std::initializer_list<Type*> args) const
     {
         auto curType = this;
         while (curType != nullptr)
@@ -395,7 +399,7 @@ public:
         return nullptr;
     }
 
-    MethodInfo* GetMethod(const std::string& name, std::initializer_list<ParameterInfo> args) const
+    virtual MethodInfo* GetMethod(const std::string& name, std::initializer_list<ParameterInfo> args) const
     {
         auto curType = this;
         while (curType != nullptr)
@@ -427,7 +431,7 @@ public:
     }
 
     // 遍历类型的属性
-    std::vector<PropertyInfo*> GetProperties() const
+    virtual std::vector<PropertyInfo*> GetProperties() const
     {
         std::vector<PropertyInfo*> rets;
         const Type* curType = this;
@@ -440,7 +444,7 @@ public:
     }
 
     // 获取类型的属性
-    PropertyInfo* GetProperty(const std::string& name) const
+    virtual PropertyInfo* GetProperty(const std::string& name) const
     {
         auto curType = this;
         while (curType != nullptr)
@@ -602,7 +606,9 @@ public:
             callback(entry.second);
     }
 
-private:
+public:
+    // Made public for DynamicType registration
+
     static std::map<std::string, Type*>& GetRegistry()
     {
         static std::map<std::string, Type*> registry;

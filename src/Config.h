@@ -58,6 +58,8 @@ namespace rtti::detail
 //   } // namespace rtti::detail
 // ============================================================================
 
+#ifndef RTTI_CUSTOM_POINTER_OPS
+
 template <typename T>
 struct pointer_ops
 {
@@ -78,22 +80,25 @@ struct pointer_ops
     static Ptr<T> from_raw(T* raw) { return raw->shared_from_this(); }
 };
 
-// ============================================================================
-// object_base<T> — Customization point for the Object root class base.
-//
-// Default: std::enable_shared_from_this<T>.
-//
-// Specialize this (typically for rtti::Object) BEFORE including any RTTI
-// header to replace the base of the Object class.
-// ============================================================================
-
-template <typename T>
-struct object_base
-{
-    using type = std::enable_shared_from_this<T>;
-};
+#endif // RTTI_CUSTOM_POINTER_OPS
 
 } // namespace rtti::detail
+
+// ============================================================================
+// RTTI_OBJECT_BASE — Customization point for the Object root class base.
+//
+// Default: std::enable_shared_from_this<Object>.
+//
+// Define this BEFORE including any RTTI header to replace the base class.
+//
+// Example:
+//   #define RTTI_OBJECT_BASE MyCustomBase
+//   #include <RTTI/RTTI.h>
+// ============================================================================
+
+#ifndef RTTI_OBJECT_BASE
+#define RTTI_OBJECT_BASE std::enable_shared_from_this<Object>
+#endif
 
 // ============================================================================
 // Logging macros

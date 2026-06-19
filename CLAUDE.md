@@ -33,7 +33,7 @@ ctest -V           # 或通过 CTest 运行
 
 | 文件 | 职责 |
 |------|------|
-| `Config.h` | 指针类型别名 `RTTI_PTR_ALIAS(T)`（默认 `std::shared_ptr<T>`）+ 操作 traits：`pointer_ops<T>`（make/ptr_cast/to_raw/from_raw）、`object_base<T>`（Object 基类定制）。日志宏 |
+| `Config.h` | 自定义宏：`RTTI_PTR_ALIAS(T)`（指针类型别名，默认 `std::shared_ptr<T>`）、`RTTI_OBJECT_BASE`（Object 基类，默认 `std::enable_shared_from_this<Object>`）、`RTTI_CUSTOM_POINTER_OPS`（跳过默认 `pointer_ops`）。日志宏 |
 | `System.h` | 前向声明、`MakePtr`/`PtrCast`/`RawFromPtr`/`PtrFromRaw` 辅助函数、`ObjectPtr` 类型、`is_object<T>`/`ObjectType`/`ValueType` concept、`HASH` 编译期字符串哈希宏 |
 | `Reflection.h` | `TypeWarper<T>` 类型分派、`type_of<T>()`（返回类型单例 `Type*`）、`CreateType<T,BASE>()`（惰性创建 Type 对象）、`TYPE_DECLARE` 宏（在类中声明反射支持） |
 | `Object.h` | 引用类型基类 `Object`，默认继承 `std::enable_shared_from_this<Object>` |
@@ -44,6 +44,42 @@ ctest -V           # 或通过 CTest 运行
 | `Type.h` | `Type` 类：类型元数据中心。包含类型名称、大小、基类、构造函数/方法/属性列表、类型转换器（`TypeConvertor`）、比较器（`ObjectComparer`）。提供 `Convert`（类型转换）、`Compare`（规范顺序保证对称性）、`Find`（O(log n) Map 查找）、`ForEach`（遍历所有类型）等静态方法，以及 `cast<To,From>()` 模板函数 |
 | `TypeRegister.h` | `TypeRegister<T>`：流式 API 注册类型。对非枚举类型提供 `constructor`/`property`/`method`/`convert`/`compare`；对枚举类型提供 `value`/`compare`。还有 `DefaultEnumRegister` 自动注册枚举的基础设施 |
 | `RTTI.h` | 汇总头文件 + `InitCoreType()` 注册所有基础类型（bool、int8_t~uint64_t、float、double、void*、string）及其相互转换/比较关系 |
+| `DynamicType.h` | 运行时动态类型支持：`DynamicType`（map schema → Type）、`DynamicObject`（属性存储在 `map<string, ObjectPtr>` 中）、`DynamicPropertyInfo`/`DynamicMethodInfo`/`DynamicConstructorInfo`（绕过编译期 getter/setter，直接读写 map） |
+
+### 动态类型（DynamicType）
+
+允许在运行时通过 map schema 创建 Type，无需编译期注册：
+
+```cpp
+#include <RTTI/DynamicType.h>
+
+// 1. 定义 schema
+std::map<std::string, Type*> schema;
+schema["x"] = type_of<float>();
+schema["y"] = type_of<float>();
+
+// 2. 注册动态类型（可选指定 baseType 实现继承）
+auto* vec3Type = NewDynamicType("DynVec3", schema);
+
+// 3. 创建实例 + 读写属性（与普通 Type 相同的反射 API）
+auto obj = vec3Type->CreateInstance({});
+vec3Type->GetProperty("x")->SetValue(obj, Box(1.0f));
+float x = vec3Type->GetProperty("x")->GetValue<float>(obj);
+
+// 4. 添加动态方法
+auto method = NewDynamicMethod(nullptr, "Add", type_of<int>(),
+    {{type_of<int>(), false, false}},
+    [](const ObjectPtr&, const std::vector<ObjectPtr>& args) {
+        return Box(Unbox<int>(args[0]) + Unbox<int>(args[1]));
+    });
+auto* dt = NewDynamicType("Calc", {{"v", type_of<int>()}}, {method});
+```
+
+- `DynamicPropertyInfo` 直接读写 `DynamicObject` 内部 `map<string, ObjectPtr>`，不通过 `MethodInfo`
+- `DynamicMethodInfo` 包装 `std::function`，支持运行时注册任意可调用对象
+- `DynamicObject` 提供 `Get(name)` / `Set(name, value)` 辅助方法
+- `NewDynamicType(name, schema, methods, attributes, baseType)` — `baseType` 支持动态类型之间的继承或继承编译期类型
+- 所有工厂函数支持 `const map<size_t, any>& attributes` 参数
 
 ### 类型注册表
 
@@ -63,11 +99,11 @@ ctest -V           # 或通过 CTest 运行
 
 ### 自定义配置
 
-**智能指针类型**：在包含 RTTI 头文件之前定义 `RTTI_PTR_ALIAS(T)` 宏 + 特化 `rtti::detail::pointer_ops<T>` 提供 make/ptr_cast/to_raw/from_raw 四个操作。
+**智能指针类型**：在包含 RTTI 头文件之前，定义 `RTTI_PTR_ALIAS(T)` 宏 + `RTTI_CUSTOM_POINTER_OPS` 宏，并提供自定义的 `rtti::detail::pointer_ops<T>` 主模板（注意需要先打开 `namespace rtti::detail`）。
 
-**Object 基类**：特化 `rtti::detail::object_base<rtti::Object>` 替换默认的 `std::enable_shared_from_this` 基类。
+**Object 基类**：定义 `RTTI_OBJECT_BASE` 宏替换默认的 `std::enable_shared_from_this<Object>`。
 
-所有翻译单元中的自定义特化必须一致（否则 ODR 违规）。类型注册应在单线程启动阶段完成。详见 README.md 的"自定义配置"章节。
+所有翻译单元中的自定义定义必须一致（否则 ODR 违规）。类型注册应在单线程启动阶段完成。详见 README.md 的"自定义配置"章节。
 
 ### 关键设计约束
 

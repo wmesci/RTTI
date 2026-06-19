@@ -164,6 +164,85 @@ TypeRegister<MyClass>::New("MyClass")
     .convert<std::string>();  // 允许 MyClass 转换为 string
 ```
 
+### 动态类型
+
+`DynamicType` 允许在运行时通过 map schema 创建 Type，无需编译期注册。适合脚本绑定、数据驱动设计等场景。
+
+```cpp
+#include <RTTI/RTTI.h>
+#include <RTTI/DynamicType.h>
+
+// 1. 定义 schema（属性名 → 属性类型）
+std::map<std::string, Type*> schema;
+schema["x"]     = type_of<float>();
+schema["y"]     = type_of<float>();
+schema["name"]  = type_of<std::string>();
+
+// 2. 注册动态类型
+auto* vec3Type = NewDynamicType("DynamicVector3", schema);
+
+// 3. 创建实例
+auto obj = vec3Type->CreateInstance({});
+
+// 4. 通过反射 API 读写属性
+vec3Type->GetProperty("x")->SetValue(obj, Box(1.0f));
+vec3Type->GetProperty("y")->SetValue(obj, Box(2.0f));
+float x = vec3Type->GetProperty("x")->GetValue<float>(obj);  // 1.0f
+```
+
+#### 子类继承
+
+动态类型可以继承另一个 Type（动态或编译期），自动获得父类的属性和方法：
+
+```cpp
+// 父类：动态 Entity
+auto* entityType = NewDynamicType("Entity",
+    {{"id", type_of<int>()}});
+
+// 子类：动态 Player，继承 Entity
+auto* playerType = NewDynamicType("Player",
+    {{"hp", type_of<int>()}},   // 自有属性
+    {},                          // 方法
+    {},                          // attributes
+    entityType);                 // baseType
+
+// 子类自动获得父类属性
+playerType->GetProperty("id");  // 从 Entity 继承
+playerType->GetProperty("hp");  // Player 自有
+
+// IsSubClassOf 检查
+playerType->IsSubClassOf(entityType);  // true
+```
+
+#### 动态方法
+
+```cpp
+auto method = NewDynamicMethod(
+    nullptr, "Add", type_of<int>(),
+    {{type_of<int>(), false, false}},
+    [](const ObjectPtr&, const std::vector<ObjectPtr>& args) -> ObjectPtr {
+        return Box(Unbox<int>(args[0]) + Unbox<int>(args[1]));
+    });
+
+auto* calcType = NewDynamicType("Calculator",
+    {{"value", type_of<int>()}}, {method});
+
+auto obj = calcType->CreateInstance({});
+auto result = calcType->GetMethod("Add")->Invoke(obj, {Box(10), Box(20)});
+int sum = Unbox<int>(result);  // 30
+```
+
+#### DynamicObject 辅助 API
+
+```cpp
+auto obj = vec3Type->CreateInstance({});
+auto* dyn = static_cast<DynamicObject*>(RawFromPtr(obj));
+dyn->Set("x", Box(5.0f));
+ObjectPtr v = dyn->Get("x");  // Box(5.0f)
+```
+
+> **注意**：动态类型在 map 中查找属性为 O(log n)。属性读写不经过编译期 getter/setter（`DynamicPropertyInfo` 直接操作 `DynamicObject` 内部 map）。工厂函数返回的对象为 process-lifetime（与 Type 一致的 intentional leak 模式）。
+
 ### 类型系统
 
 RTTI 库支持两种对象类型：
@@ -212,60 +291,61 @@ RTTI 支持自定义基类和智能指针类型，以适应不同的项目需求
 
 ### 自定义智能指针类型
 
-RTTI 默认使用 `std::shared_ptr<T>` 作为智能指针类型。如需全局替换（如使用 `IntrusivePtr`），在包含任何 RTTI 头文件**之前**定义 `RTTI_PTR_ALIAS` 宏，并为你的类型特化 `pointer_ops`：
+RTTI 默认使用 `std::shared_ptr<T>`。如需使用自定义智能指针（如 `IntrusivePtr`），在包含 RTTI 头文件**之前**：
+
+1. 定义 `RTTI_PTR_ALIAS(T)` 宏指定指针类型
+2. 定义 `RTTI_CUSTOM_POINTER_OPS` 宏跳过默认实现
+3. 在 `namespace rtti::detail` 中提供自定义的 `pointer_ops<T>` 主模板
+
+注意：由于 `rtti::Ptr<T>` 此时尚未定义，返回值类型需使用 `RTTI_PTR_ALIAS(U)` 宏。
 
 ```cpp
-// 1. 定义指针类型别名
-#define RTTI_PTR_ALIAS(T) my::IntrusivePtr<T>
+// 在包含 RTTI 头文件之前
+#define RTTI_PTR_ALIAS(T)       my::IntrusivePtr<T>
+#define RTTI_CUSTOM_POINTER_OPS
 
-// 2. 为你的智能指针提供操作特化
 namespace rtti::detail {
 template <typename T>
-struct pointer_ops<T> {
+struct pointer_ops {
+    using PtrT = RTTI_PTR_ALIAS(T);
+
     template <typename U = T, typename... Args>
-    static rtti::Ptr<U> make(Args&&... args) {
+    static RTTI_PTR_ALIAS(U) make(Args&&... args) {
         return my::MakeIntrusive<U>(std::forward<Args>(args)...);
     }
 
     template <typename U>
-    static rtti::Ptr<U> ptr_cast(const rtti::Ptr<T>& p) {
+    static RTTI_PTR_ALIAS(U) ptr_cast(const PtrT& p) {
         return my::static_pointer_cast<U>(p);
     }
 
-    static T* to_raw(const rtti::Ptr<T>& p) noexcept { return p.get(); }
-    static rtti::Ptr<T> from_raw(T* raw) { return rtti::Ptr<T>(raw); }
+    static T* to_raw(const PtrT& p) noexcept { return p.get(); }
+    static PtrT from_raw(T* raw) { return PtrT(raw); }
 };
 } // namespace rtti::detail
 
-// 3. 现在包含 RTTI 头文件
 #include <RTTI/RTTI.h>
 ```
 
 ### 自定义 Object 基类
 
-默认情况下，RTTI 使用 `std::enable_shared_from_this<T>` 作为 Object 的基类。如需自定义，在包含 RTTI 头文件之前特化 `object_base`：
+默认情况下 RTTI 使用 `std::enable_shared_from_this<Object>` 作为 Object 基类。如需替换，定义 `RTTI_OBJECT_BASE` 宏：
 
 ```cpp
-namespace rtti::detail {
-template <>
-struct object_base<rtti::Object> {
-    using type = MyCustomBase;  // 替换 enable_shared_from_this
-};
-} // namespace rtti::detail
-
+#define RTTI_OBJECT_BASE MyCustomBase
 #include <RTTI/RTTI.h>
 ```
 
 ### 自定义指针的操作要求
 
-自定义智能指针类型需要支持以下操作（在 `pointer_ops` 特化中实现）：
+自定义智能指针类型需在 `pointer_ops` 中实现以下操作：
 
 - `make<U>(args...)` — 创建智能指针实例
 - `ptr_cast<U>(p)` — 智能指针类型转换（如 `static_pointer_cast`）
 - `to_raw(p)` — 从智能指针获取原始指针
 - `from_raw(raw)` — 从原始指针获取智能指针（注意生命周期）
 
-> **注意**：所有翻译单元中的自定义特化必须保持一致，否则会导致 ODR 违规（程序 ill-formed, no diagnostic required）。类型注册（`type_of<T>()`、`TypeRegister::New()`）应在单线程启动阶段完成。
+> **注意**：所有翻译单元中的自定义定义必须保持一致，否则会导致 ODR 违规（程序 ill-formed, no diagnostic required）。类型注册（`type_of<T>()`、`TypeRegister::New()`）应在单线程启动阶段完成。
 
 ## 最佳实践
 

@@ -2,6 +2,7 @@
 #include <cstdlib>
 #define RTTI_ENABLE_LOG 1
 #include <RTTI.h>
+#include <DynamicType.h>
 
 using namespace rtti;
 using namespace std::string_literals;
@@ -708,6 +709,393 @@ void test_create_and_convert()
 }
 
 // ============================================================================
+// 15. DynamicType — registration, properties, instances
+// ============================================================================
+
+void test_dynamic_type_basics()
+{
+    InitCoreType();
+
+    std::map<std::string, DynamicPropertyDesc> schema;
+    schema["x"] = type_of<float>();
+    schema["y"] = type_of<float>();
+    schema["name"] = type_of<std::string>();
+
+    auto* dt = NewDynamicType("DynVec3", schema);
+    EXPECT(dt != nullptr);
+
+    // Type::Find
+    EXPECT_EQ(Type::Find("DynVec3"), dt);
+
+    // GetName
+    EXPECT_STREQ(dt->GetName(), "DynVec3");
+
+    // IsValueType / IsEnum — dynamic types are reference types
+    EXPECT_FALSE(dt->IsValueType());
+    EXPECT_FALSE(dt->IsEnum());
+    EXPECT_FALSE(dt->IsPointer());
+
+    // GetBaseType is Object
+    EXPECT(dt->GetBaseType() != nullptr);
+    EXPECT_EQ(dt->GetBaseType(), type_of<Object>());
+
+    // GetProperties
+    auto props = dt->GetProperties();
+    EXPECT_TRUE(props.size() >= 3);
+
+    // GetProperty
+    auto* px = dt->GetProperty("x");
+    EXPECT(px != nullptr);
+    EXPECT_TRUE(px->CanRead());
+    EXPECT_TRUE(px->CanWrite());
+    EXPECT_EQ(px->PropertyType(), type_of<float>());
+
+    auto* pn = dt->GetProperty("name");
+    EXPECT(pn != nullptr);
+    EXPECT_EQ(pn->PropertyType(), type_of<std::string>());
+
+    // Non-existent property
+    EXPECT(dt->GetProperty("nonexistent") == nullptr);
+}
+
+void test_dynamic_create_instance()
+{
+    InitCoreType();
+
+    std::map<std::string, DynamicPropertyDesc> schema;
+    schema["val"] = type_of<int>();
+
+    auto* dt = NewDynamicType("DynInt", schema);
+
+    // Create default instance
+    auto obj = dt->CreateInstance({});
+    EXPECT(obj != nullptr);
+
+    // Instance has correct RTTI type (DynamicObject is an Object subclass)
+    EXPECT(obj->GetRttiType() != nullptr);
+    EXPECT(obj->GetRttiType()->IsSubClassOf(type_of<Object>()));
+
+    // GetConstructors
+    auto ctors = dt->GetConstructors();
+    EXPECT_TRUE(ctors.size() >= 1);
+
+    // GetConstructor (default)
+    auto* defCtor = dt->GetConstructor();
+    EXPECT(defCtor != nullptr);
+    EXPECT_TRUE(defCtor->GetParameters().empty());
+}
+
+void test_dynamic_property_read_write()
+{
+    InitCoreType();
+
+    std::map<std::string, DynamicPropertyDesc> schema;
+    schema["x"] = type_of<float>();
+    schema["flag"] = type_of<bool>();
+    schema["label"] = type_of<std::string>();
+
+    auto* dt = NewDynamicType("DynProps", schema);
+    auto obj = dt->CreateInstance({});
+
+    // Set and get float property
+    dt->GetProperty("x")->SetValue(obj, Box(3.14f));
+    float x = dt->GetProperty("x")->GetValue<float>(obj);
+    EXPECT_EQ(x, 3.14f);
+
+    // Set and get bool property
+    dt->GetProperty("flag")->SetValue(obj, Box(true));
+    bool flag = dt->GetProperty("flag")->GetValue<bool>(obj);
+    EXPECT_TRUE(flag);
+
+    // String property
+    dt->GetProperty("label")->SetValue(obj, Box("dynamic"s));
+    std::string label = dt->GetProperty("label")->GetValue<std::string>(obj);
+    EXPECT_STREQ(label, "dynamic");
+}
+
+void test_dynamic_independent_instances()
+{
+    InitCoreType();
+
+    std::map<std::string, DynamicPropertyDesc> schema;
+    schema["v"] = type_of<int>();
+
+    auto* dt = NewDynamicType("DynIndependent", schema);
+    auto obj1 = dt->CreateInstance({});
+    auto obj2 = dt->CreateInstance({});
+
+    // Set different values
+    dt->GetProperty("v")->SetValue(obj1, Box(100));
+    dt->GetProperty("v")->SetValue(obj2, Box(200));
+
+    EXPECT_EQ(dt->GetProperty("v")->GetValue<int>(obj1), 100);
+    EXPECT_EQ(dt->GetProperty("v")->GetValue<int>(obj2), 200);
+
+    // Modify obj1, obj2 unchanged
+    dt->GetProperty("v")->SetValue(obj1, Box(300));
+    EXPECT_EQ(dt->GetProperty("v")->GetValue<int>(obj1), 300);
+    EXPECT_EQ(dt->GetProperty("v")->GetValue<int>(obj2), 200);
+}
+
+void test_dynamic_method()
+{
+    InitCoreType();
+
+    std::map<std::string, DynamicPropertyDesc> schema;
+    schema["a"] = type_of<int>();
+    schema["b"] = type_of<int>();
+
+    Type* owner = nullptr;
+    auto method = NewDynamicMethod(
+        owner, "Add", type_of<int>(),
+        {{type_of<int>(), false, false}, {type_of<int>(), false, false}},
+        [](const ObjectPtr&, const std::vector<ObjectPtr>& args) -> ObjectPtr {
+            int a = Unbox<int>(args[0]);
+            int b = Unbox<int>(args[1]);
+            return Box(a + b);
+        });
+
+    EXPECT(method != nullptr);
+    EXPECT_STREQ(method->GetName(), "Add");
+    EXPECT_EQ(method->ReturnType(), type_of<int>());
+
+    // Register dynamic type with the method
+    auto* dt = NewDynamicType("DynMethod", schema, {method});
+
+    auto* foundMethod = dt->GetMethod("Add");
+    EXPECT(foundMethod != nullptr);
+
+    // Invoke
+    auto obj = dt->CreateInstance({});
+    auto result = foundMethod->Invoke(obj, {Box(10), Box(20)});
+    EXPECT_EQ(Unbox<int>(result), 30);
+}
+
+void test_dynamic_attributes()
+{
+    InitCoreType();
+
+    std::map<std::string, DynamicPropertyDesc> schema;
+    schema["health"] = type_of<int>();
+
+    // DynamicType with attributes
+    auto* dt = NewDynamicType("DynAttr", schema, {},
+        {{HASH("category"), std::string("entity")}});
+
+    EXPECT_TRUE(dt->HasAttribute(HASH("category")));
+    EXPECT_STREQ(dt->GetAttribute<std::string>(HASH("category")), "entity");
+
+    // DynamicMethod with attributes
+    auto method = NewDynamicMethod(
+        nullptr, "Heal", type_of<void>(), {},
+        [](const ObjectPtr&, const std::vector<ObjectPtr>&) -> ObjectPtr {
+            return nullptr;
+        },
+        {{HASH("tooltip"), std::string("Restore HP")}});
+
+    EXPECT_TRUE(method->HasAttribute(HASH("tooltip")));
+    EXPECT_STREQ(method->GetAttribute<std::string>(HASH("tooltip")), "Restore HP");
+}
+
+void test_dynamic_edge_cases()
+{
+    InitCoreType();
+
+    // Empty schema
+    std::map<std::string, DynamicPropertyDesc> emptySchema;
+    auto* emptyType = NewDynamicType("DynEmpty", emptySchema);
+    EXPECT(emptyType != nullptr);
+    EXPECT_TRUE(emptyType->GetProperties().empty());
+
+    // Create instance of empty type
+    auto emptyObj = emptyType->CreateInstance({});
+    EXPECT(emptyObj != nullptr);
+
+    // Non-existent property
+    EXPECT(emptyType->GetProperty("foo") == nullptr);
+
+    // Non-existent method
+    EXPECT(emptyType->GetMethod("bar") == nullptr);
+
+    // DynamicObject helper
+    auto* dyn = static_cast<DynamicObject*>(RawFromPtr(emptyObj));
+    EXPECT(dyn != nullptr);
+
+    // Get non-existent attribute
+    std::string def = dyn->Get("nonexistent") ? "has" : "null";
+    // Get returns nullptr for non-existent keys
+    EXPECT(dyn->Get("nonexistent") == nullptr);
+}
+
+// ============================================================================
+// 22. Dynamic property / method / constructor attributes
+// ============================================================================
+
+void test_dynamic_per_property_attributes()
+{
+    InitCoreType();
+
+    // Schema with per-property attributes
+    std::map<std::string, DynamicPropertyDesc> schema;
+    schema["hp"].type = type_of<int>();
+    schema["hp"].attributes = {{HASH("min"), 0}, {HASH("max"), 100}};
+    schema["label"].type = type_of<std::string>();
+    schema["label"].attributes = {{HASH("max_length"), 32}};
+
+    auto* dt = NewDynamicType("DynPropAttr", schema);
+
+    // Property attributes accessible via reflection
+    auto* hpProp = dt->GetProperty("hp");
+    EXPECT(hpProp != nullptr);
+    EXPECT_TRUE(hpProp->HasAttribute(HASH("min")));
+    EXPECT_EQ(hpProp->GetAttribute<int>(HASH("min")), 0);
+    EXPECT_EQ(hpProp->GetAttribute<int>(HASH("max")), 100);
+
+    auto* labelProp = dt->GetProperty("label");
+    EXPECT_TRUE(labelProp->HasAttribute(HASH("max_length")));
+    EXPECT_EQ(labelProp->GetAttribute<int>(HASH("max_length")), 32);
+
+    // Properties without explicit attributes have none
+    EXPECT_FALSE(labelProp->HasAttribute(HASH("min")));
+}
+
+void test_dynamic_method_attributes()
+{
+    InitCoreType();
+
+    auto method = NewDynamicMethod(
+        nullptr, "Validate", type_of<bool>(), {},
+        [](const ObjectPtr&, const std::vector<ObjectPtr>&) -> ObjectPtr {
+            return Box(true);
+        },
+        {{HASH("category"), std::string("validation")},
+         {HASH("order"), 1}});
+
+    EXPECT_TRUE(method->HasAttribute(HASH("category")));
+    EXPECT_STREQ(method->GetAttribute<std::string>(HASH("category")), "validation");
+    EXPECT_EQ(method->GetAttribute<int>(HASH("order")), 1);
+
+    // Register with the method
+    auto* dt = NewDynamicType("DynMethodAttr", {{"x", type_of<float>()}}, {method});
+    auto* found = dt->GetMethod("Validate");
+    EXPECT(found != nullptr);
+    EXPECT_TRUE(found->HasAttribute(HASH("category")));
+}
+
+void test_dynamic_constructor_attributes()
+{
+    InitCoreType();
+
+    auto ctor = NewDynamicConstructor(
+        nullptr, {{type_of<int>(), false, false}},
+        [](const std::vector<ObjectPtr>& args) -> ObjectPtr {
+            auto obj = MakePtr<DynamicObject>();
+            static_cast<DynamicObject*>(RawFromPtr(obj))->Set("val", args[0]);
+            return obj;
+        },
+        {{HASH("description"), std::string("creates with initial value")}});
+
+    EXPECT_TRUE(ctor->HasAttribute(HASH("description")));
+    EXPECT_STREQ(ctor->GetAttribute<std::string>(HASH("description")),
+                 "creates with initial value");
+}
+
+void test_dynamic_standalone_property()
+{
+    InitCoreType();
+
+    auto* dt = NewDynamicType("DynStandalone", {});
+
+    // Create a standalone property with attributes and add it to the type
+    auto* prop = NewDynamicProperty(dt, "bonus", type_of<float>(),
+        {{HASH("default"), 0.0f}});
+
+    EXPECT(prop != nullptr);
+    EXPECT_STREQ(prop->GetName(), "bonus");
+    EXPECT_TRUE(prop->HasAttribute(HASH("default")));
+}
+
+// ============================================================================
+// 22. DynamicType subclass (base type inheritance)
+// ============================================================================
+
+void test_dynamic_subclass()
+{
+    InitCoreType();
+
+    // Parent dynamic type
+    std::map<std::string, DynamicPropertyDesc> parentSchema;
+    parentSchema["name"] = type_of<std::string>();
+    auto* parentDt = NewDynamicType("DynParent", parentSchema);
+
+    // Child dynamic type inheriting from parent
+    std::map<std::string, DynamicPropertyDesc> childSchema;
+    childSchema["hp"] = type_of<int>();
+    auto* childDt = NewDynamicType("DynChild", childSchema, {}, {}, parentDt);
+
+    // IsSubClassOf
+    EXPECT_TRUE(childDt->IsSubClassOf(parentDt));
+    EXPECT_TRUE(childDt->IsSubClassOf(type_of<Object>()));
+    EXPECT_FALSE(parentDt->IsSubClassOf(childDt));
+
+    // GetBaseType
+    EXPECT_EQ(childDt->GetBaseType(), parentDt);
+
+    // Inherited properties appear in child
+    auto* inheritedProp = childDt->GetProperty("name");
+    EXPECT(inheritedProp != nullptr);
+    EXPECT_EQ(inheritedProp->PropertyType(), type_of<std::string>());
+
+    // Child's own properties
+    auto* ownProp = childDt->GetProperty("hp");
+    EXPECT(ownProp != nullptr);
+    EXPECT_EQ(ownProp->PropertyType(), type_of<int>());
+
+    // GetProperties includes both own + inherited
+    auto allProps = childDt->GetProperties();
+    EXPECT_TRUE(allProps.size() >= 2);
+
+    // Create instance and use inherited + own properties
+    auto obj = childDt->CreateInstance({});
+    inheritedProp->SetValue(obj, Box("hero"s));
+    ownProp->SetValue(obj, Box(100));
+    EXPECT_STREQ(childDt->GetProperty("name")->GetValue<std::string>(obj), "hero");
+    EXPECT_EQ(childDt->GetProperty("hp")->GetValue<int>(obj), 100);
+}
+
+void test_dynamic_subclass_compile_time()
+{
+    RegisterAllTypes();
+    InitCoreType();
+
+    // Dynamic type inheriting from compile-time TestBase
+    std::map<std::string, DynamicPropertyDesc> schema;
+    schema["extra"] = type_of<float>();
+    auto* dt = NewDynamicType("DynExtendsTestBase", schema, {}, {},
+                              type_of<TestBase>());
+
+    // IsSubClassOf
+    EXPECT_TRUE(dt->IsSubClassOf(type_of<TestBase>()));
+    EXPECT_TRUE(dt->IsSubClassOf(type_of<Object>()));
+
+    // Inherited property from TestBase
+    auto* baseProp = dt->GetProperty("TestBaseA");
+    EXPECT(baseProp != nullptr);  // TestBaseA is defined on TestBase
+
+    // Own property
+    auto* extraProp = dt->GetProperty("extra");
+    EXPECT(extraProp != nullptr);
+
+    // Create instance — effective type is set to the DynamicType
+    auto obj = dt->CreateInstance({});
+    EXPECT(obj != nullptr);
+    EXPECT_EQ(obj->GetRttiType(), dt);
+
+    // IsAssignableFrom now works because GetRttiType returns the DynamicType
+    EXPECT(type_of<TestBase>()->IsAssignableFrom(obj));
+}
+
+// ============================================================================
 // main
 // ============================================================================
 
@@ -731,6 +1119,19 @@ int main()
     run_test("void*, ObjectBox, string",    test_special_types);
     run_test("Inheritance",                 test_inheritance);
     run_test("Create and CanConvertTo",     test_create_and_convert);
+    run_test("DynamicType basics",           test_dynamic_type_basics);
+    run_test("Dynamic create instance",      test_dynamic_create_instance);
+    run_test("Dynamic property read/write",  test_dynamic_property_read_write);
+    run_test("Dynamic independent instances", test_dynamic_independent_instances);
+    run_test("Dynamic method",               test_dynamic_method);
+    run_test("Dynamic attributes",           test_dynamic_attributes);
+    run_test("Dynamic edge cases",           test_dynamic_edge_cases);
+    run_test("Dynamic per-prop attributes",   test_dynamic_per_property_attributes);
+    run_test("Dynamic method attributes",      test_dynamic_method_attributes);
+    run_test("Dynamic ctor attributes",        test_dynamic_constructor_attributes);
+    run_test("Dynamic standalone property",    test_dynamic_standalone_property);
+    run_test("Dynamic subclass (dynamic)",     test_dynamic_subclass);
+    run_test("Dynamic subclass (compile-time)", test_dynamic_subclass_compile_time);
 
     printf("\n========================================\n");
     int total = g_passed + g_failed;

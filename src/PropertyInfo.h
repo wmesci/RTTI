@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 #include "System.h"
 #include "Object.h"
 #include "ObjectBox.h"
@@ -20,6 +20,7 @@ private:
     MethodInfo* getter;
     MethodInfo* setter;
 
+protected:
     PropertyInfo(Type* owner, const std::string& name, Type* type, MethodInfo* getter, MethodInfo* setter, const std::map<size_t, std::any>& attributes)
         : Attributable(attributes)
         , owner(owner)
@@ -31,17 +32,19 @@ private:
     }
 
 public:
-    Type* OwnerType() const { return owner; }
+    virtual ~PropertyInfo() = default;
 
-    Type* PropertyType() const { return type; }
+    virtual Type* OwnerType() const { return owner; }
 
-    const std::string& GetName() const { return name; }
+    virtual Type* PropertyType() const { return type; }
 
-    bool CanRead() const { return getter != nullptr; }
+    virtual const std::string& GetName() const { return name; }
 
-    bool CanWrite() const { return setter != nullptr; }
+    virtual bool CanRead() const { return getter != nullptr; }
 
-    ObjectPtr GetValue(const ObjectPtr& obj) const
+    virtual bool CanWrite() const { return setter != nullptr; }
+
+    virtual ObjectPtr GetValue(const ObjectPtr& obj) const
     {
         return getter->Invoke(obj, {});
     }
@@ -52,7 +55,7 @@ public:
         return cast<T>(GetValue(obj));
     }
 
-    void SetValue(const ObjectPtr& obj, const ObjectPtr& value) const
+    virtual void SetValue(const ObjectPtr& obj, const ObjectPtr& value) const
     {
         if (setter != nullptr)
             setter->Invoke(obj, {value});

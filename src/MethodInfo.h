@@ -80,13 +80,15 @@ protected:
     }
 
 public:
-    const std::string& GetName() const { return name; }
+    virtual ~MethodBase() = default;
 
-    Type* OwnerType() const { return owner; }
+    virtual const std::string& GetName() const { return name; }
 
-    Type* ReturnType() const { return rettype; }
+    virtual Type* OwnerType() const { return owner; }
 
-    const std::vector<ParameterInfo>& GetParameters() { return arguments; }
+    virtual Type* ReturnType() const { return rettype; }
+
+    virtual const std::vector<ParameterInfo>& GetParameters() { return arguments; }
 };
 
 class ConstructorInfo : public MethodBase
@@ -102,7 +104,7 @@ protected:
     }
 
 public:
-    ObjectPtr Invoke(const std::vector<ObjectPtr>& args)
+    virtual ObjectPtr Invoke(const std::vector<ObjectPtr>& args)
     {
         return func(args);
     }
@@ -141,7 +143,7 @@ public:
 
 class MethodInfo : public MethodBase
 {
-private:
+protected:
     enum class MethodFlags
     {
         None = 0,
@@ -151,13 +153,21 @@ private:
     MethodFlags m_flags = MethodFlags::None;
     std::function<ObjectPtr(const ObjectPtr&, const std::vector<ObjectPtr>&)> m_func;
 
+protected:
+    MethodInfo(Type* owner, const std::string& name, MethodFlags flags, Type* rettype, std::initializer_list<ParameterInfo> arguments, std::function<ObjectPtr(const ObjectPtr&, const std::vector<ObjectPtr>&)> func, const std::map<size_t, std::any>& attributes)
+        : MethodBase(owner, name, rettype, arguments, attributes)
+        , m_flags(flags)
+        , m_func(func)
+    {
+    }
+
 public:
-    bool IsStatic() const
+    virtual bool IsStatic() const
     {
         return ((int32_t)m_flags & (int32_t)MethodFlags::Static) != 0;
     }
 
-    ObjectPtr Invoke(const ObjectPtr& target, const std::vector<ObjectPtr>& args)
+    virtual ObjectPtr Invoke(const ObjectPtr& target, const std::vector<ObjectPtr>& args)
     {
         return m_func(target, args);
     }
@@ -166,13 +176,6 @@ public:
     ObjectPtr Invoke(const ObjectPtr& target, Args... args)
     {
         return m_func(target, {Box(args)...});
-    }
-
-    MethodInfo(Type* owner, const std::string& name, MethodFlags flags, Type* rettype, std::initializer_list<ParameterInfo> arguments, std::function<ObjectPtr(const ObjectPtr&, const std::vector<ObjectPtr>&)> func, const std::map<size_t, std::any>& attributes)
-        : MethodBase(owner, name, rettype, arguments, attributes)
-        , m_flags(flags)
-        , m_func(func)
-    {
     }
 
     template <typename Host, typename FUNC, typename RET, typename... Args>
