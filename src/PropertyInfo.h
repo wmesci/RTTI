@@ -1,64 +1,139 @@
 #pragma once
-#include "System.h"
+
+#include <memory>
+#include <string>
+#include <type_traits>
+#include <utility>
+
+#include "Attributable.h"
+#include "Error.h"
+#include "MethodInfo.h"
 #include "Object.h"
 #include "ObjectBox.h"
-#include "Attributable.h"
-#include "MethodInfo.h"
+#include "System.h"
 
 namespace rtti
 {
+
 class PropertyInfo : public Attributable
 {
 private:
     template <typename T, bool>
     friend struct TypeRegister;
 
-private:
-    Type* owner;
-    std::string name;
-    Type* type;
-    MethodInfo* getter;
-    MethodInfo* setter;
-
 protected:
-    PropertyInfo(Type* owner, const std::string& name, Type* type, MethodInfo* getter, MethodInfo* setter, const std::map<size_t, std::any>& attributes)
+    PropertyInfo(Type* owner,
+                 const std::string& name,
+                 Type* type,
+                 std::unique_ptr<MethodInfo> getter,
+                 std::unique_ptr<MethodInfo> setter,
+                 const std::map<size_t, std::any>& attributes)
         : Attributable(attributes)
-        , owner(owner)
-        , name(name)
-        , type(type)
-        , getter(getter)
-        , setter(setter)
+        , m_owner(owner)
+        , m_name(name)
+        , m_type(type)
+        , m_getter(std::move(getter))
+        , m_setter(std::move(setter))
     {
     }
 
 public:
     virtual ~PropertyInfo() = default;
 
-    virtual Type* OwnerType() const { return owner; }
+    Type* GetOwnerType() const { return m_owner; }
 
-    virtual Type* PropertyType() const { return type; }
+    Type* GetPropertyType() const { return m_type; }
 
-    virtual const std::string& GetName() const { return name; }
+    const std::string& GetName() const { return m_name; }
 
-    virtual bool CanRead() const { return getter != nullptr; }
+    // Internal registration hook used by DynamicType.
+    void SetOwner(Type* owner) { m_owner = owner; }
 
-    virtual bool CanWrite() const { return setter != nullptr; }
+    virtual bool CanRead() const { return m_getter != nullptr; }
 
-    virtual ObjectPtr GetValue(const ObjectPtr& obj) const
+    virtual bool CanWrite() const { return m_setter != nullptr; }
+
+    virtual ObjectPtr GetValue(const ObjectPtr& object) const
     {
-        return getter->Invoke(obj, {});
+        if (!m_getter)
+        {
+            ReportError(ErrorCode::InvalidOperation, "property '" + m_name + "' is not readable");
+            return nullptr;
+        }
+        return m_getter->Invoke(object, {});
+    }
+
+    virtual bool TryGetValue(const ObjectPtr& object, ObjectPtr& value) const noexcept
+    {
+        if (!m_getter)
+            return Fail(ErrorCode::InvalidOperation, "property '" + m_name + "' is not readable");
+        return m_getter->TryInvoke(object, {}, value);
     }
 
     template <typename T>
-    T GetValue(const ObjectPtr& obj) const
+    T GetValue(const ObjectPtr& object) const
     {
-        return cast<T>(GetValue(obj));
+        static_assert(!is_object<remove_const_ref<T>>, "use GetValue<Ptr<T>>() for reference types");
+        ObjectPtr value = GetValue(object);
+        bool ok = false;
+        T result = cast<T>(value, &ok);
+        if (!ok)
+        {
+            ReportError(ErrorCode::TypeMismatch, "property '" + m_name + "' cannot be read as the requested type");
+            return T{};
+        }
+        return result;
     }
 
-    virtual void SetValue(const ObjectPtr& obj, const ObjectPtr& value) const
+    template <typename T>
+    bool TryGetValue(const ObjectPtr& object, T& value) const noexcept
     {
-        if (setter != nullptr)
-            setter->Invoke(obj, {value});
+        static_assert(!is_object<remove_const_ref<T>>, "use TryGetValue<Ptr<T>>() for reference types");
+        ObjectPtr boxed;
+        if (!TryGetValue(object, boxed))
+            return false;
+        return try_cast<T>(boxed, value);
     }
+
+    virtual void SetValue(const ObjectPtr& object, const ObjectPtr& value) const
+    {
+        if (!m_setter)
+        {
+            ReportError(ErrorCode::ReadOnlyProperty, "property '" + m_name + "' is read-only");
+            return;
+        }
+        m_setter->Invoke(object, { value });
+    }
+
+    virtual bool TrySetValue(const ObjectPtr& object, const ObjectPtr& value) const noexcept
+    {
+        if (!m_setter)
+            return Fail(ErrorCode::ReadOnlyProperty, "property '" + m_name + "' is read-only");
+        ObjectPtr ignored;
+        return m_setter->TryInvoke(object, { value }, ignored);
+    }
+
+    template <typename T>
+    void SetValue(const ObjectPtr& object, const T& value) const
+    {
+        SetValue(object, Box(value));
+    }
+
+    template <typename T>
+    bool TrySetValue(const ObjectPtr& object, const T& value) const noexcept
+    {
+        ObjectPtr ignored;
+        if (!m_setter)
+            return Fail(ErrorCode::ReadOnlyProperty, "property '" + m_name + "' is read-only");
+        return m_setter->TryInvoke(object, { Box(value) }, ignored);
+    }
+
+private:
+    Type* m_owner = nullptr;
+    std::string m_name;
+    Type* m_type = nullptr;
+    std::unique_ptr<MethodInfo> m_getter;
+    std::unique_ptr<MethodInfo> m_setter;
 };
+
 } // namespace rtti

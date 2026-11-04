@@ -1,20 +1,32 @@
-﻿#pragma once
-#if defined(__clang__)
-#define __debugbreak __builtin_debugtrap
-#elif defined(_MSC_VER)
-#define __PRETTY_FUNCTION__ __FUNCSIG__
-#endif
+#pragma once
 
-#include <type_traits>
-#include <cassert>
-#include <string>
-#include <memory>
+#include <cstddef>
+#include <cstdint>
 #include <functional>
+#include <memory>
+#include <string>
+#include <string_view>
+#include <type_traits>
+#include <utility>
 
 #include "Config.h"
+#include "Error.h"
 
 namespace rtti
 {
+
+class Object;
+class ObjectBox;
+class Type;
+class TypeRegistry;
+class MethodBase;
+class ConstructorInfo;
+class MethodInfo;
+class PropertyInfo;
+
+template <typename T>
+class Boxed;
+
 template <typename T, typename... Args>
 inline Ptr<T> MakePtr(Args&&... args)
 {
@@ -36,25 +48,19 @@ inline T* RawFromPtr(const Ptr<T>& p) noexcept
 template <typename T>
 inline Ptr<T> PtrFromRaw(T* raw)
 {
+    if (raw == nullptr)
+        return Ptr<T>();
     return detail::pointer_ops<T>::from_raw(raw);
 }
 
-class Object;
 using ObjectPtr = Ptr<Object>;
-
-class ObjectBox;
 using ObjectBoxPtr = Ptr<ObjectBox>;
 
-template <typename T>
-class Boxed;
+// ----------------------------------------------------------------------------
+// Hashing helpers
+// ----------------------------------------------------------------------------
 
-class Type;
-class MethodBase;
-class ConstructorInfo;
-class MethodInfo;
-class PropertyInfo;
-
-inline constexpr void hash_combine(size_t& seed, size_t hash)
+inline constexpr void hash_combine(size_t& seed, size_t hash) noexcept
 {
     seed ^= hash + 0x9e3779b9 + (seed << 6) + (seed >> 2);
 }
@@ -67,35 +73,57 @@ inline constexpr size_t hash(const Args&... args)
     return seed;
 }
 
-constexpr size_t hash_string(const char* str, size_t size = 0)
-{
-    if (!str) return 0;
+inline constexpr size_t hash_string_npos = static_cast<size_t>(-1);
 
-    size_t hash = 0;
-    if (size == 0) {
+constexpr size_t hash_string(const char* str, size_t size = hash_string_npos) noexcept
+{
+    if (str == nullptr)
+        return 0;
+
+    size_t result = 0;
+    if (size == hash_string_npos)
+    {
         while (*str != '\0')
         {
-            hash_combine(hash, static_cast<size_t>(static_cast<unsigned char>(*str)));
+            hash_combine(result, static_cast<size_t>(static_cast<unsigned char>(*str)));
             str++;
         }
-    } else {
-        for (size_t i = 0; i < size; i++) {
-            hash_combine(hash, static_cast<size_t>(static_cast<unsigned char>(str[i])));
-        }
     }
-    return hash;
+    else
+    {
+        for (size_t i = 0; i < size; i++)
+            hash_combine(result, static_cast<size_t>(static_cast<unsigned char>(str[i])));
+    }
+    return result;
 }
 
 template <auto V>
 static constexpr auto force_consteval = V;
 
-#define HASH(str) rtti::force_consteval<rtti::hash_string(str)>
+#define RTTI_HASH(str) ::rtti::force_consteval<::rtti::hash_string(str)>
+
+// ----------------------------------------------------------------------------
+// Type traits
+// ----------------------------------------------------------------------------
 
 template <typename T>
-using remove_cr = std::remove_const_t<std::remove_reference_t<T>>;
+using remove_const_ref = std::remove_const_t<std::remove_reference_t<T>>;
 
 template <typename T>
-constexpr bool is_object = std::is_base_of<Object, T>::value;  // is_base_of<T,T> is true
+constexpr bool is_object = std::is_base_of<Object, T>::value;
+
+template <typename T>
+struct is_ptr : std::false_type
+{
+};
+
+template <typename T>
+struct is_ptr<Ptr<T>> : std::true_type
+{
+};
+
+template <typename T>
+inline constexpr bool is_ptr_v = is_ptr<remove_const_ref<T>>::value;
 
 template <typename T>
 concept ObjectType = is_object<T>;
@@ -108,4 +136,20 @@ inline ObjectPtr ctor(Args... args);
 
 template <class To, class From>
 inline auto cast(const From& from, bool* pOK = nullptr);
+
+template <class To, class From>
+inline auto cast_or_throw(const From& from);
+
+template <class To, class From>
+inline bool try_cast(const From& from, To& out);
+
+template <ValueType T>
+    requires(!is_ptr_v<T>)
+inline ObjectPtr Box(T value);
+
+template <ValueType T>
+inline T Unbox(const ObjectPtr& ptr);
+
+bool IsTypeRegistryFrozen() noexcept;
+
 } // namespace rtti

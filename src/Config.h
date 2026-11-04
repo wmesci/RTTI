@@ -1,19 +1,16 @@
 #pragma once
 
+#include <cstdio>
 #include <memory>
+#include <string>
+#include <string_view>
+#include <utility>
 
 // ============================================================================
-// Ptr<T> — The smart pointer type alias used throughout the library.
+// Ptr<T> — the smart pointer type alias used throughout the library.
 //
-// Default: std::shared_ptr<T>.
-//
-// To use a different smart pointer globally, define RTTI_PTR_ALIAS before
-// including any RTTI header.  Make sure ALL translation units see the same
-// definition.
-//
-// Example:
-//   #define RTTI_PTR_ALIAS(T) my::IntrusivePtr<T>
-//   #include <RTTI/RTTI.h>
+// Default: std::shared_ptr<T>. Define RTTI_PTR_ALIAS before including any RTTI
+// header to use a different smart pointer. All translation units must agree.
 // ============================================================================
 
 #ifndef RTTI_PTR_ALIAS
@@ -28,35 +25,6 @@ using Ptr = RTTI_PTR_ALIAS(T);
 
 namespace rtti::detail
 {
-
-// ============================================================================
-// pointer_ops<T> — Customization point for smart pointer operations.
-//
-// Default: operations for std::shared_ptr<T>.
-//
-// When using a custom smart pointer via RTTI_PTR_ALIAS, you MUST also
-// specialize pointer_ops<T> for your types BEFORE including any RTTI header.
-//
-// Example for a custom intrusive pointer:
-//
-//   namespace rtti::detail {
-//   template <typename T>
-//   struct pointer_ops<T> {
-//       template <typename U = T, typename... Args>
-//       static rtti::Ptr<U> make(Args&&... args) {
-//           return my::MakeIntrusive<U>(std::forward<Args>(args)...);
-//       }
-//
-//       template <typename U>
-//       static rtti::Ptr<U> ptr_cast(const rtti::Ptr<T>& p) {
-//           return my::static_pointer_cast<U>(p);
-//       }
-//
-//       static T* to_raw(const rtti::Ptr<T>& p) noexcept { return p.get(); }
-//       static rtti::Ptr<T> from_raw(T* raw) { return rtti::Ptr<T>(raw); }
-//   };
-//   } // namespace rtti::detail
-// ============================================================================
 
 #ifndef RTTI_CUSTOM_POINTER_OPS
 
@@ -77,7 +45,12 @@ struct pointer_ops
 
     static T* to_raw(const Ptr<T>& p) noexcept { return p.get(); }
 
-    static Ptr<T> from_raw(T* raw) { return raw->shared_from_this(); }
+    static Ptr<T> from_raw(T* raw)
+    {
+        if (raw == nullptr)
+            return Ptr<T>();
+        return std::static_pointer_cast<T>(raw->shared_from_this());
+    }
 };
 
 #endif // RTTI_CUSTOM_POINTER_OPS
@@ -85,15 +58,10 @@ struct pointer_ops
 } // namespace rtti::detail
 
 // ============================================================================
-// RTTI_OBJECT_BASE — Customization point for the Object root class base.
+// Object root base customization.
 //
-// Default: std::enable_shared_from_this<Object>.
-//
-// Define this BEFORE including any RTTI header to replace the base class.
-//
-// Example:
-//   #define RTTI_OBJECT_BASE MyCustomBase
-//   #include <RTTI/RTTI.h>
+// Default: std::enable_shared_from_this<Object>. Define RTTI_OBJECT_BASE
+// before including any RTTI header to replace it.
 // ============================================================================
 
 #ifndef RTTI_OBJECT_BASE
@@ -101,31 +69,78 @@ struct pointer_ops
 #endif
 
 // ============================================================================
-// Logging macros
+// Exception support
 // ============================================================================
 
-#define RTTI_LOG(x, msg) printf("[" #x "]: %s\n\t\t in %s[%s:%d]\n", (msg), __PRETTY_FUNCTION__, __FILE__, __LINE__)
-
-#if !defined(RTTI_DEBUG)
-#if defined(RTTI_ENABLE_LOG)
-#define RTTI_DEBUG(msg) RTTI_LOG(DEBUG, msg)
+#if !defined(RTTI_HAS_EXCEPTIONS)
+#if defined(RTTI_NO_EXCEPTIONS)
+#define RTTI_HAS_EXCEPTIONS 0
+#elif defined(__cpp_exceptions) || defined(__EXCEPTIONS) || defined(_CPPUNWIND)
+#define RTTI_HAS_EXCEPTIONS 1
 #else
-#define RTTI_DEBUG(msg)
-#endif
-#endif
-
-#if !defined(RTTI_WARNING)
-#if defined(RTTI_ENABLE_LOG)
-#define RTTI_WARNING(msg) RTTI_LOG(WARNING, msg)
-#else
-#define RTTI_WARNING(msg)
+#define RTTI_HAS_EXCEPTIONS 0
 #endif
 #endif
 
-#if !defined(RTTI_ERROR)
-#if defined(RTTI_ENABLE_LOG)
-#define RTTI_ERROR(msg) RTTI_LOG(ERROR, msg)
+// ============================================================================
+// Logging
+//
+// The library never writes to stdout/stderr by itself. Install a handler with
+// SetLogHandler(); when RTTI_ENABLE_LOG is defined a stderr handler is
+// installed by default.
+// ============================================================================
+
+namespace rtti
+{
+
+enum class LogLevel
+{
+    Debug,
+    Warning,
+    Error
+};
+
+using LogHandler = void (*)(LogLevel, const char*);
+
+#if defined(RTTI_ENABLE_LOG) && RTTI_ENABLE_LOG
+inline void DefaultLogHandler(LogLevel level, const char* message) noexcept
+{
+    const char* name = level == LogLevel::Debug ? "debug" : (level == LogLevel::Warning ? "warning" : "error");
+    std::fprintf(stderr, "[rtti][%s] %s\n", name, message ? message : "");
+}
+#endif
+
+inline LogHandler& LogHandlerStorage() noexcept
+{
+#if defined(RTTI_ENABLE_LOG) && RTTI_ENABLE_LOG
+    static LogHandler handler = &DefaultLogHandler;
 #else
-#define RTTI_ERROR(msg)
+    static LogHandler handler = nullptr;
 #endif
-#endif
+    return handler;
+}
+
+inline void SetLogHandler(LogHandler handler) noexcept { LogHandlerStorage() = handler; }
+
+inline LogHandler GetLogHandler() noexcept { return LogHandlerStorage(); }
+
+inline bool HasLogHandler() noexcept { return LogHandlerStorage() != nullptr; }
+
+inline void Log(LogLevel level, std::string_view message) noexcept
+{
+    if (LogHandler handler = GetLogHandler())
+        handler(level, std::string(message).c_str());
+}
+
+} // namespace rtti
+
+#define RTTI_LOG(level, msg)                                                     \
+    do                                                                           \
+    {                                                                            \
+        if (::rtti::HasLogHandler())                                             \
+            ::rtti::Log(::rtti::LogLevel::level, (msg));                         \
+    } while (0)
+
+#define RTTI_DEBUG(msg) RTTI_LOG(Debug, msg)
+#define RTTI_WARNING(msg) RTTI_LOG(Warning, msg)
+#define RTTI_ERROR(msg) RTTI_LOG(Error, msg)

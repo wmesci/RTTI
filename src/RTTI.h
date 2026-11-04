@@ -1,377 +1,99 @@
-﻿#pragma once
-#include "System.h"
+#pragma once
+
+#include <mutex>
+#include <set>
+#include <string>
+#include <string_view>
+
+#include "MethodInfo.h"
 #include "Object.h"
 #include "ObjectBox.h"
-#include "Reflection.h"
-#include "Type.h"
-#include "MethodInfo.h"
 #include "PropertyInfo.h"
+#include "Reflection.h"
+#include "System.h"
+#include "Type.h"
 #include "TypeRegister.h"
 
 namespace rtti
 {
+
+namespace detail
+{
+
+template <typename T>
+void RegisterNumericType(std::set<Type*>& registered)
+{
+    Type* type = type_of<T>();
+    if (!registered.insert(type).second)
+        return;
+
+    TypeRegistry::Get().SetCanonicalName(type, GetTypeName<T>());
+    TypeRegister<T>::New(GetTypeName<T>(), {})
+        .template constructor<>()
+        .template constructor<T>();
+}
+
+template <typename T>
+void RegisterNamedNumericType(std::set<Type*>& registered, const char* name)
+{
+    Type* type = type_of<T>();
+    if (!registered.insert(type).second)
+        return;
+
+    TypeRegistry::Get().SetCanonicalName(type, name);
+    TypeRegister<T>::New(std::string(name), {})
+        .template constructor<>()
+        .template constructor<T>();
+}
+
+} // namespace detail
+
 inline void InitCoreType()
 {
-    TypeRegister<Object>::New("Object");
-    TypeRegister<ObjectBox>::New("ObjectBox");
+    static std::once_flag once;
+    std::call_once(once, []
+    {
+        // Root/value types first.
+        TypeRegistry::Get().SetCanonicalName(type_of<Object>(), "Object");
+        TypeRegistry::Get().SetCanonicalName(type_of<ObjectBox>(), "ObjectBox");
 
-    TypeRegister<bool>::New("bool")
-        .constructor<>()
-        .constructor<bool>()
-        .convert<int8_t>()
-        .convert<uint8_t>()
-        .convert<int16_t>()
-        .convert<uint16_t>()
-        .convert<int32_t>()
-        .convert<uint32_t>()
-        .convert<int64_t>()
-        .convert<uint64_t>()
-        .convert<long>()
-        .convert<unsigned long>()
-        .compare<bool>()
-        .compare<int8_t>()
-        .compare<uint8_t>()
-        .compare<int16_t>()
-        .compare<uint16_t>()
-        .compare<int32_t>()
-        .compare<uint32_t>()
-        .compare<int64_t>()
-        .compare<uint64_t>()
-        .compare<long>()
-        .compare<unsigned long>();
+        std::set<Type*> registered;
 
-    TypeRegister<int8_t>::New("int8_t")
-        .constructor<>()
-        .constructor<int8_t>()
-        .convert<uint8_t>()
-        .convert<int16_t>()
-        .convert<uint16_t>()
-        .convert<int32_t>()
-        .convert<uint32_t>()
-        .convert<int64_t>()
-        .convert<uint64_t>()
-        .convert<long>()
-        .convert<unsigned long>()
-        .convert<float>()
-        .convert<double>()
-        .compare<int8_t>()
-        .compare<uint8_t>()
-        .compare<int16_t>()
-        .compare<uint16_t>()
-        .compare<int32_t>()
-        .compare<uint32_t>()
-        .compare<int64_t>()
-        .compare<uint64_t>()
-        .compare<long>()
-        .compare<unsigned long>()
-        .compare<float>()
-        .compare<double>();
+        // Fixed-width names are canonical so serialized data is stable across
+        // platforms. Additional fundamental types are registered afterwards
+        // with their compiler name.
+        detail::RegisterNamedNumericType<bool>(registered, "bool");
+        detail::RegisterNamedNumericType<int8_t>(registered, "int8_t");
+        detail::RegisterNamedNumericType<uint8_t>(registered, "uint8_t");
+        detail::RegisterNamedNumericType<int16_t>(registered, "int16_t");
+        detail::RegisterNamedNumericType<uint16_t>(registered, "uint16_t");
+        detail::RegisterNamedNumericType<int32_t>(registered, "int32_t");
+        detail::RegisterNamedNumericType<uint32_t>(registered, "uint32_t");
+        detail::RegisterNamedNumericType<int64_t>(registered, "int64_t");
+        detail::RegisterNamedNumericType<uint64_t>(registered, "uint64_t");
+        detail::RegisterNamedNumericType<float>(registered, "float");
+        detail::RegisterNamedNumericType<double>(registered, "double");
 
-    TypeRegister<uint8_t>::New("uint8_t")
-        .constructor<>()
-        .constructor<uint8_t>()
-        .convert<int8_t>()
-        .convert<int16_t>()
-        .convert<uint16_t>()
-        .convert<int32_t>()
-        .convert<uint32_t>()
-        .convert<int64_t>()
-        .convert<uint64_t>()
-        .convert<long>()
-        .convert<unsigned long>()
-        .convert<float>()
-        .convert<double>()
-        .compare<int8_t>()
-        .compare<uint8_t>()
-        .compare<int16_t>()
-        .compare<uint16_t>()
-        .compare<int32_t>()
-        .compare<uint32_t>()
-        .compare<int64_t>()
-        .compare<uint64_t>()
-        .compare<long>()
-        .compare<unsigned long>()
-        .compare<float>()
-        .compare<double>();
+        detail::RegisterNumericType<char>(registered);
+        detail::RegisterNumericType<wchar_t>(registered);
+        detail::RegisterNumericType<char8_t>(registered);
+        detail::RegisterNumericType<char16_t>(registered);
+        detail::RegisterNumericType<char32_t>(registered);
+        detail::RegisterNumericType<long>(registered);
+        detail::RegisterNumericType<unsigned long>(registered);
+        detail::RegisterNumericType<long long>(registered);
+        detail::RegisterNumericType<unsigned long long>(registered);
+        detail::RegisterNumericType<long double>(registered);
 
-    TypeRegister<int16_t>::New("int16_t")
-        .constructor<>()
-        .constructor<int16_t>()
-        .convert<int8_t>()
-        .convert<uint8_t>()
-        .convert<uint16_t>()
-        .convert<int32_t>()
-        .convert<uint32_t>()
-        .convert<int64_t>()
-        .convert<uint64_t>()
-        .convert<long>()
-        .convert<unsigned long>()
-        .convert<float>()
-        .convert<double>()
-        .compare<int8_t>()
-        .compare<uint8_t>()
-        .compare<int16_t>()
-        .compare<uint16_t>()
-        .compare<int32_t>()
-        .compare<uint32_t>()
-        .compare<int64_t>()
-        .compare<uint64_t>()
-        .compare<long>()
-        .compare<unsigned long>()
-        .compare<float>()
-        .compare<double>();
+        TypeRegistry::Get().SetCanonicalName(type_of<std::string>(), "string");
+        TypeRegister<std::string>::New("string")
+            .template constructor<>()
+            .constructor<const std::string&>()
+            .compare<std::string>();
 
-    TypeRegister<uint16_t>::New("uint16_t")
-        .constructor<>()
-        .constructor<uint16_t>()
-        .convert<int8_t>()
-        .convert<uint8_t>()
-        .convert<int16_t>()
-        .convert<int32_t>()
-        .convert<uint32_t>()
-        .convert<int64_t>()
-        .convert<uint64_t>()
-        .convert<long>()
-        .convert<unsigned long>()
-        .convert<float>()
-        .convert<double>()
-        .compare<int8_t>()
-        .compare<uint8_t>()
-        .compare<int16_t>()
-        .compare<uint16_t>()
-        .compare<int32_t>()
-        .compare<uint32_t>()
-        .compare<int64_t>()
-        .compare<uint64_t>()
-        .compare<long>()
-        .compare<unsigned long>()
-        .compare<float>()
-        .compare<double>();
-
-    TypeRegister<int32_t>::New("int32_t")
-        .constructor<>()
-        .constructor<int32_t>()
-        .convert<int8_t>()
-        .convert<uint8_t>()
-        .convert<int16_t>()
-        .convert<uint16_t>()
-        .convert<uint32_t>()
-        .convert<int64_t>()
-        .convert<uint64_t>()
-        .convert<long>()
-        .convert<unsigned long>()
-        .convert<float>()
-        .convert<double>()
-        .compare<int8_t>()
-        .compare<uint8_t>()
-        .compare<int16_t>()
-        .compare<uint16_t>()
-        .compare<int32_t>()
-        .compare<uint32_t>()
-        .compare<int64_t>()
-        .compare<uint64_t>()
-        .compare<long>()
-        .compare<unsigned long>()
-        .compare<float>()
-        .compare<double>();
-
-    TypeRegister<uint32_t>::New("uint32_t")
-        .constructor<>()
-        .constructor<uint32_t>()
-        .convert<int8_t>()
-        .convert<uint8_t>()
-        .convert<int16_t>()
-        .convert<uint16_t>()
-        .convert<int32_t>()
-        .convert<int64_t>()
-        .convert<uint64_t>()
-        .convert<long>()
-        .convert<unsigned long>()
-        .convert<float>()
-        .convert<double>()
-        .compare<int8_t>()
-        .compare<uint8_t>()
-        .compare<int16_t>()
-        .compare<uint16_t>()
-        .compare<int32_t>()
-        .compare<uint32_t>()
-        .compare<int64_t>()
-        .compare<uint64_t>()
-        .compare<long>()
-        .compare<unsigned long>()
-        .compare<float>()
-        .compare<double>();
-
-    TypeRegister<int64_t>::New("int64_t")
-        .constructor<>()
-        .constructor<int64_t>()
-        .convert<int8_t>()
-        .convert<uint8_t>()
-        .convert<int16_t>()
-        .convert<uint16_t>()
-        .convert<int32_t>()
-        .convert<uint32_t>()
-        .convert<uint64_t>()
-        .convert<long>()
-        .convert<unsigned long>()
-        .convert<float>()
-        .convert<double>()
-        .compare<int8_t>()
-        .compare<uint8_t>()
-        .compare<int16_t>()
-        .compare<uint16_t>()
-        .compare<int32_t>()
-        .compare<uint32_t>()
-        .compare<int64_t>()
-        .compare<uint64_t>()
-        .compare<long>()
-        .compare<unsigned long>()
-        .compare<float>()
-        .compare<double>();
-
-    TypeRegister<uint64_t>::New("uint64_t")
-        .constructor<>()
-        .constructor<uint64_t>()
-        .convert<int8_t>()
-        .convert<uint8_t>()
-        .convert<int16_t>()
-        .convert<uint16_t>()
-        .convert<int32_t>()
-        .convert<uint32_t>()
-        .convert<int64_t>()
-        .convert<long>()
-        .convert<unsigned long>()
-        .convert<float>()
-        .convert<double>()
-        .compare<int8_t>()
-        .compare<uint8_t>()
-        .compare<int16_t>()
-        .compare<uint16_t>()
-        .compare<int32_t>()
-        .compare<uint32_t>()
-        .compare<int64_t>()
-        .compare<uint64_t>()
-        .compare<long>()
-        .compare<unsigned long>()
-        .compare<float>()
-        .compare<double>();
-
-    TypeRegister<long>::New("long")
-        .constructor<>()
-        .constructor<long>()
-        .convert<int8_t>()
-        .convert<uint8_t>()
-        .convert<int16_t>()
-        .convert<uint16_t>()
-        .convert<int32_t>()
-        .convert<uint32_t>()
-        .convert<int64_t>()
-        .convert<uint64_t>()
-        .convert<unsigned long>()
-        .convert<float>()
-        .convert<double>()
-        .compare<int8_t>()
-        .compare<uint8_t>()
-        .compare<int16_t>()
-        .compare<uint16_t>()
-        .compare<int32_t>()
-        .compare<uint32_t>()
-        .compare<int64_t>()
-        .compare<uint64_t>()
-        .compare<long>()
-        .compare<unsigned long>()
-        .compare<float>()
-        .compare<double>();
-
-    TypeRegister<unsigned long>::New("unsigned long")
-        .constructor<>()
-        .constructor<unsigned long>()
-        .convert<int8_t>()
-        .convert<uint8_t>()
-        .convert<int16_t>()
-        .convert<uint16_t>()
-        .convert<int32_t>()
-        .convert<uint32_t>()
-        .convert<int64_t>()
-        .convert<uint64_t>()
-        .convert<long>()
-        .convert<float>()
-        .convert<double>()
-        .compare<int8_t>()
-        .compare<uint8_t>()
-        .compare<int16_t>()
-        .compare<uint16_t>()
-        .compare<int32_t>()
-        .compare<uint32_t>()
-        .compare<int64_t>()
-        .compare<uint64_t>()
-        .compare<long>()
-        .compare<unsigned long>()
-        .compare<float>()
-        .compare<double>();
-
-    TypeRegister<float>::New("float")
-        .constructor<>()
-        .constructor<float>()
-        .convert<int8_t>()
-        .convert<uint8_t>()
-        .convert<int16_t>()
-        .convert<uint16_t>()
-        .convert<int32_t>()
-        .convert<uint32_t>()
-        .convert<int64_t>()
-        .convert<uint64_t>()
-        .convert<long>()
-        .convert<unsigned long>()
-        .convert<double>()
-        .compare<int8_t>()
-        .compare<uint8_t>()
-        .compare<int16_t>()
-        .compare<uint16_t>()
-        .compare<int32_t>()
-        .compare<uint32_t>()
-        .compare<int64_t>()
-        .compare<uint64_t>()
-        .compare<long>()
-        .compare<unsigned long>()
-        .compare<float>()
-        .compare<double>();
-
-    TypeRegister<double>::New("double")
-        .constructor<>()
-        .constructor<double>()
-        .convert<int8_t>()
-        .convert<uint8_t>()
-        .convert<int16_t>()
-        .convert<uint16_t>()
-        .convert<int32_t>()
-        .convert<uint32_t>()
-        .convert<int64_t>()
-        .convert<uint64_t>()
-        .convert<long>()
-        .convert<unsigned long>()
-        .convert<float>()
-        .compare<int8_t>()
-        .compare<uint8_t>()
-        .compare<int16_t>()
-        .compare<uint16_t>()
-        .compare<int32_t>()
-        .compare<uint32_t>()
-        .compare<int64_t>()
-        .compare<uint64_t>()
-        .compare<long>()
-        .compare<unsigned long>()
-        .compare<float>()
-        .compare<double>();
-
-    TypeRegister<void*>::New("void*")
-        .constructor<>()
-        .constructor<void*>()
-        .compare<void*>();
-
-    TypeRegister<std::string>::New("string")
-        .constructor<>()
-        .constructor<const std::string&>()
-        .compare<std::string>();
+        TypeRegistry::Get().SetCanonicalName(type_of<void*>(), "void*");
+        TypeRegister<void*>::New("void*").template constructor<>().constructor<void*>().compare<void*>();
+    });
 }
+
 } // namespace rtti

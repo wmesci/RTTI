@@ -1,48 +1,34 @@
 #pragma once
-#include "System.h"
+
+#include <cstddef>
+#include <functional>
+#include <initializer_list>
+#include <memory>
+#include <optional>
+#include <string>
+#include <tuple>
+#include <type_traits>
+#include <utility>
+#include <vector>
+
+#include "Attributable.h"
+#include "Error.h"
 #include "Object.h"
 #include "ObjectBox.h"
-#include "Attributable.h"
-
-namespace
-{
-template <typename Tuple, typename Iterator, std::size_t... I>
-static Tuple MakeArgsImpl(const Iterator& p, std::index_sequence<I...>)
-{
-    bool ok = true;
-    Tuple result{rtti::cast<std::tuple_element_t<I, Tuple>>(p[I], &ok)...};
-    if (!ok)
-        RTTI_WARNING("argument conversion failed in MakeArgs");
-    return result;
-}
-
-// Convert each ObjectPtr in the Iterator to the type corresponding to Args and place it in a tuple.
-template <typename... Args, typename Iterator>
-static auto MakeArgs(const Iterator& p)
-{
-    static_assert(std::is_same_v<rtti::remove_cr<decltype(p[0])>, rtti::ObjectPtr>, "Iterator type must be ObjectPtr");
-
-    using Tuple = std::tuple<rtti::remove_cr<Args>...>;
-    return MakeArgsImpl<Tuple>(p, std::make_index_sequence<sizeof...(Args)>{});
-}
-
-template <typename T>
-static rtti::ParameterInfo GetParameterInfo()
-{
-    static_assert(std::is_reference_v<T> == std::is_const_v<std::remove_reference_t<T>>);
-
-    return {rtti::type_of<T>(), std::is_reference_v<T>, std::is_const_v<std::remove_reference_t<T>>};
-}
-} // namespace
+#include "Reflection.h"
+#include "System.h"
 
 namespace rtti
 {
 
 namespace detail
 {
-// Detect captureless (stateless) lambdas: only captureless lambdas are
-// implicitly convertible to a function pointer, which the unary + operator
-// triggers.  Lambdas with captures (value or reference) will SFINAE out.
+
+template <typename>
+inline constexpr bool always_false_v = false;
+
+// Detect captureless (stateless) lambdas: only those are implicitly convertible
+// to a function pointer. Lambdas with captures SFINAE out.
 template <typename T, typename = void>
 struct is_stateless_lambda : std::false_type
 {
@@ -55,233 +41,425 @@ struct is_stateless_lambda<T, std::void_t<decltype(+std::declval<T>())>> : std::
 
 template <typename FUNC>
 constexpr bool is_allowed_method_callable_v =
-    std::is_function_v<std::remove_pointer_t<FUNC>> ||     // function pointer
-    std::is_member_function_pointer_v<FUNC> ||              // member function pointer
-    std::is_member_object_pointer_v<FUNC> ||                // member object pointer
-    is_stateless_lambda<FUNC>::value;                       // captureless lambda
+    std::is_function_v<std::remove_pointer_t<FUNC>> || std::is_member_function_pointer_v<FUNC> ||
+    std::is_member_object_pointer_v<FUNC> || is_stateless_lambda<FUNC>::value;
+
+template <typename T>
+ParameterInfo ParameterInfoOf()
+{
+    return { type_of<T>(), std::is_lvalue_reference_v<T>, std::is_const_v<std::remove_reference_t<T>> };
+}
+
+template <typename Arg>
+struct StoredArgument
+{
+    using type = Arg;
+};
+
+template <typename Arg>
+struct StoredArgument<const Arg&>
+{
+    using type = Arg;
+};
+
+template <typename Arg>
+using StoredArgumentT = typename StoredArgument<Arg>::type;
+
+template <typename Arg>
+Arg CastArgument(const ObjectPtr& object, bool& ok);
+
+template <typename... Args, typename Iterator, std::size_t... I>
+std::optional<std::tuple<StoredArgumentT<Args>...>> MakeArgsImpl(const Iterator& p, std::index_sequence<I...>);
+
+template <typename... Args, typename Iterator>
+std::optional<std::tuple<StoredArgumentT<Args>...>> MakeArgs(const Iterator& p);
+
+template <typename R>
+bool StoreReturn(R&& value, ObjectPtr& out)
+{
+    using V = remove_const_ref<R>;
+    if constexpr (is_ptr_v<V>)
+    {
+        out = Box(value);
+        return true;
+    }
+    else if constexpr (is_object<V>)
+    {
+        if constexpr (std::is_pointer_v<V>)
+        {
+            out = Box(PtrFromRaw(value));
+            return true;
+        }
+        else
+        {
+            out = Box(PtrFromRaw(const_cast<V*>(std::addressof(value))));
+            return true;
+        }
+    }
+    else if constexpr (std::is_pointer_v<V>)
+    {
+        out = Box(value);
+        return true;
+    }
+    else
+    {
+        out = Box(std::forward<R>(value));
+        return true;
+    }
+}
+
+inline bool CheckArgumentCount(const char* owner, const char* name, size_t expected, size_t actual)
+{
+    if (expected == actual)
+        return true;
+    return Fail(ErrorCode::ArgumentCount, std::string(owner ? owner : "?") + "::" + (name ? name : "?") +
+                                               " expects " + std::to_string(expected) + " arguments, got " +
+                                               std::to_string(actual));
+}
+
 } // namespace detail
 
 class MethodBase : public Attributable
 {
-private:
-    std::string name;
-    Type* owner;
-    Type* rettype;
-    std::vector<ParameterInfo> arguments;
-
 protected:
-    MethodBase(Type* owner, const std::string& name, Type* rettype, std::initializer_list<ParameterInfo> arguments, const std::map<size_t, std::any>& attributes)
+    MethodBase(Type* owner,
+               const std::string& name,
+               Type* returnType,
+               std::initializer_list<ParameterInfo> parameters,
+               const std::map<size_t, std::any>& attributes)
         : Attributable(attributes)
-        , name(name)
-        , owner(owner)
-        , rettype(rettype)
-        , arguments(arguments)
+        , m_owner(owner)
+        , m_name(name)
+        , m_returnType(returnType)
     {
+        m_parameters.assign(parameters.begin(), parameters.end());
     }
 
 public:
     virtual ~MethodBase() = default;
 
-    virtual const std::string& GetName() const { return name; }
+    const std::string& GetName() const { return m_name; }
 
-    virtual Type* OwnerType() const { return owner; }
+    Type* GetOwnerType() const { return m_owner; }
 
-    virtual Type* ReturnType() const { return rettype; }
+    Type* GetReturnType() const { return m_returnType; }
 
-    virtual const std::vector<ParameterInfo>& GetParameters() { return arguments; }
+    const std::vector<ParameterInfo>& GetParameters() const { return m_parameters; }
+
+    // Internal registration hook used by DynamicType.
+    void SetOwner(Type* owner) { m_owner = owner; }
+
+protected:
+    Type* m_owner = nullptr;
+    std::string m_name;
+    Type* m_returnType = nullptr;
+    std::vector<ParameterInfo> m_parameters;
 };
 
 class ConstructorInfo : public MethodBase
 {
-private:
-    std::function<ObjectPtr(const std::vector<ObjectPtr>&)> func;
+public:
+    using Callable = std::function<bool(const std::vector<ObjectPtr>&, ObjectPtr&)>;
 
 protected:
-    ConstructorInfo(Type* owner, std::initializer_list<ParameterInfo> arguments, std::function<ObjectPtr(const std::vector<ObjectPtr>&)> func, const std::map<size_t, std::any>& attributes)
-        : MethodBase(owner, ".ctor", owner, arguments, attributes)
-        , func(func)
+    ConstructorInfo(Type* owner,
+                    std::initializer_list<ParameterInfo> parameters,
+                    Callable function,
+                    const std::map<size_t, std::any>& attributes)
+        : MethodBase(owner, ".ctor", nullptr, parameters, attributes)
+        , m_function(std::move(function))
     {
     }
 
 public:
-    virtual ObjectPtr Invoke(const std::vector<ObjectPtr>& args)
+    bool TryInvoke(const std::vector<ObjectPtr>& arguments, ObjectPtr& result) noexcept
     {
-        return func(args);
-    }
-
-    template <typename... Args>
-    ObjectPtr Invoke(Args... arguments)
-    {
-        return func({Box(std::forward<Args>(arguments))...});
-    }
-
-    template <typename... Args>
-    static ConstructorInfo* Register(Type* host, ObjectPtr (*f)(Args...), const std::map<size_t, std::any>& attributes = {})
-    {
-        std::function<ObjectPtr(const std::vector<ObjectPtr>&)> func = [=](const std::vector<ObjectPtr>& args) -> ObjectPtr
+#if RTTI_HAS_EXCEPTIONS
+        try
         {
-            if (args.size() != sizeof...(Args))
+            return m_function(arguments, result);
+        }
+        catch (const Error&)
+        {
+            return false;
+        }
+        catch (...)
+        {
+            return Fail(ErrorCode::TargetInvocation, "constructor threw an exception");
+        }
+#else
+        return m_function(arguments, result);
+#endif
+    }
+
+    ObjectPtr Invoke(const std::vector<ObjectPtr>& arguments)
+    {
+        ObjectPtr result;
+#if RTTI_HAS_EXCEPTIONS
+        if (m_function(arguments, result))
+            return result;
+        RethrowLastError();
+#else
+        if (m_function(arguments, result))
+            return result;
+        return nullptr;
+#endif
+    }
+
+    template <typename... Args>
+        requires((!std::is_same_v<remove_const_ref<Args>, std::vector<ObjectPtr>>) && ...)
+    ObjectPtr Invoke(Args&&... arguments)
+    {
+        return Invoke({ Box(std::forward<Args>(arguments))... });
+    }
+
+    template <typename... Args>
+    static std::unique_ptr<ConstructorInfo> Register(Type* host,
+                                                     ObjectPtr (*function)(Args...),
+                                                     const std::map<size_t, std::any>& attributes = {})
+    {
+        Callable callable = [=](const std::vector<ObjectPtr>& arguments, ObjectPtr& result) -> bool
+        {
+            if (!detail::CheckArgumentCount("constructor", ".ctor", sizeof...(Args), arguments.size()))
+                return false;
+
+            auto tuple = detail::MakeArgs<Args...>(arguments);
+            if (!tuple)
             {
-                RTTI_ERROR((std::string("requires ") + std::to_string(sizeof...(Args)) + std::string(" parameters, but actually has ") + std::to_string(args.size())).c_str());
-                return nullptr;
+                if (GetLastError().code == ErrorCode::None)
+                    Fail(ErrorCode::ArgumentType, "constructor argument conversion failed");
+                return false;
             }
 
-            auto args_tuple = MakeArgs<Args...>(args);
-            return std::apply([=](Args... args)
-                              { return f(std::forward<Args>(args)...); },
-                              args_tuple);
+#if RTTI_HAS_EXCEPTIONS
+            try
+            {
+#endif
+                if constexpr (std::is_void_v<decltype(function(std::declval<Args>()...))>)
+                {
+                    std::apply(function, *tuple);
+                    result = nullptr;
+                }
+                else
+                {
+                    decltype(auto) value = std::apply(function, *tuple);
+                    return detail::StoreReturn<decltype(value)>(std::forward<decltype(value)>(value), result);
+                }
+#if RTTI_HAS_EXCEPTIONS
+            }
+            catch (const Error&)
+            {
+                throw;
+            }
+            catch (...)
+            {
+                ThrowTargetInvocation(std::current_exception());
+            }
+#endif
+            return true;
         };
-        return new ConstructorInfo(host, {GetParameterInfo<Args>()...}, func, attributes);
+
+        return std::unique_ptr<ConstructorInfo>(
+            new ConstructorInfo(host, { detail::ParameterInfoOf<Args>()... }, std::move(callable), attributes));
     }
 
     template <typename Host, typename... Args>
-    static ConstructorInfo* Register(ObjectPtr (*f)(Args...), const std::map<size_t, std::any>& attributes = {})
+    static std::unique_ptr<ConstructorInfo> Register(ObjectPtr (*function)(Args...),
+                                                     const std::map<size_t, std::any>& attributes = {})
     {
-        return Register(type_of<Host>(), f, attributes);
+        return Register(type_of<Host>(), function, attributes);
     }
+
+private:
+    Callable m_function;
 };
 
 class MethodInfo : public MethodBase
 {
-protected:
-    enum class MethodFlags
-    {
-        None = 0,
-        Static = 1
-    };
-
-    MethodFlags m_flags = MethodFlags::None;
-    std::function<ObjectPtr(const ObjectPtr&, const std::vector<ObjectPtr>&)> m_func;
+public:
+    using Callable = std::function<bool(const ObjectPtr&, const std::vector<ObjectPtr>&, ObjectPtr&)>;
 
 protected:
-    MethodInfo(Type* owner, const std::string& name, MethodFlags flags, Type* rettype, std::initializer_list<ParameterInfo> arguments, std::function<ObjectPtr(const ObjectPtr&, const std::vector<ObjectPtr>&)> func, const std::map<size_t, std::any>& attributes)
-        : MethodBase(owner, name, rettype, arguments, attributes)
-        , m_flags(flags)
-        , m_func(func)
+    MethodInfo(Type* owner,
+               const std::string& name,
+               bool isStatic,
+               Type* returnType,
+               std::initializer_list<ParameterInfo> parameters,
+               Callable function,
+               const std::map<size_t, std::any>& attributes)
+        : MethodBase(owner, name, returnType, parameters, attributes)
+        , m_isStatic(isStatic)
+        , m_function(std::move(function))
     {
     }
 
 public:
-    virtual bool IsStatic() const
+    bool IsStatic() const noexcept { return m_isStatic; }
+
+    bool TryInvoke(const ObjectPtr& target, const std::vector<ObjectPtr>& arguments, ObjectPtr& result) noexcept
     {
-        return ((int32_t)m_flags & (int32_t)MethodFlags::Static) != 0;
+#if RTTI_HAS_EXCEPTIONS
+        try
+        {
+            return m_function(target, arguments, result);
+        }
+        catch (const Error&)
+        {
+            return false;
+        }
+        catch (...)
+        {
+            return Fail(ErrorCode::TargetInvocation, "reflected method threw an exception");
+        }
+#else
+        return m_function(target, arguments, result);
+#endif
     }
 
-    virtual ObjectPtr Invoke(const ObjectPtr& target, const std::vector<ObjectPtr>& args)
+    ObjectPtr Invoke(const ObjectPtr& target, const std::vector<ObjectPtr>& arguments)
     {
-        return m_func(target, args);
+        ObjectPtr result;
+#if RTTI_HAS_EXCEPTIONS
+        if (m_function(target, arguments, result))
+            return result;
+        RethrowLastError();
+#else
+        if (m_function(target, arguments, result))
+            return result;
+        return nullptr;
+#endif
     }
 
     template <typename... Args>
-    ObjectPtr Invoke(const ObjectPtr& target, Args... args)
+        requires((!std::is_same_v<remove_const_ref<Args>, std::vector<ObjectPtr>>) && ...)
+    ObjectPtr Invoke(const ObjectPtr& target, Args&&... arguments)
     {
-        return m_func(target, {Box(args)...});
+        return Invoke(target, { Box(std::forward<Args>(arguments))... });
     }
 
     template <typename Host, typename FUNC, typename RET, typename... Args>
-    static MethodInfo* Register(const std::string& name, FUNC f, const std::map<size_t, std::any>& attributes = {})
+    static std::unique_ptr<MethodInfo> Register(const std::string& name,
+                                                FUNC function,
+                                                const std::map<size_t, std::any>& attributes = {})
     {
         static_assert(detail::is_allowed_method_callable_v<FUNC>,
-                      "Method callable must be a function pointer, member pointer, or a captureless (stateless) lambda. "
-                      "Lambdas with captures (especially reference captures) would dangle when the method is invoked later.");
+                      "Method callable must be a function pointer, member pointer, or a captureless lambda. "
+                      "Lambdas with captures (especially reference captures) would dangle when invoked later.");
 
-        std::function<ObjectPtr(const ObjectPtr&, const std::vector<ObjectPtr>&)> func = [=](const ObjectPtr& target, const std::vector<ObjectPtr>& args) -> ObjectPtr
+        using SelfType = std::remove_pointer_t<Host>;
+        constexpr bool isMember = std::is_member_function_pointer_v<FUNC> || std::is_member_object_pointer_v<FUNC>;
+        constexpr bool isMemberObject = std::is_member_object_pointer_v<FUNC>;
+
+        Callable callable = [=](const ObjectPtr& target, const std::vector<ObjectPtr>& arguments,
+                                ObjectPtr& result) -> bool
         {
-            if (args.size() < sizeof...(Args))
-            {
-                RTTI_ERROR((std::string("requires ") + std::to_string(sizeof...(Args)) + std::string(" parameters, but actually has ") + std::to_string(args.size())).c_str());
-                return nullptr;
-            }
-
-            using SelfType = std::remove_pointer_t<Host>;
+            if (!detail::CheckArgumentCount(type_of<Host>()->GetName().c_str(), name.c_str(), sizeof...(Args),
+                                            arguments.size()))
+                return false;
 
             SelfType* self = nullptr;
-            if constexpr (std::is_member_function_pointer_v<FUNC> || std::is_member_object_pointer_v<FUNC>)
+            if constexpr (isMember)
             {
-                // call menber function / field
-                if (target == nullptr)
-                {
-                    RTTI_ERROR(std::string("target cannot be nullptr").c_str());
-                    return nullptr;
-                }
-
-                Type* target_type = target->GetRttiType();
+                if (!target)
+                    return Fail(ErrorCode::NullTarget, "target is null for member '" + name + "'");
 
                 if constexpr (is_object<SelfType>)
                 {
                     if (!type_of<SelfType>()->IsAssignableFrom(target))
-                    {
-                        RTTI_ERROR((std::string("target must be ") + GetTypeName<SelfType>()).c_str());
-                        return nullptr;
-                    }
-                    self = static_cast<SelfType*>(RawFromPtr(target));
+                        return Fail(ErrorCode::TypeMismatch, "target type mismatch for member '" + name + "'");
+
+                    Object* native = target->GetNativeObject(type_of<SelfType>());
+                    if (native == nullptr)
+                        return Fail(ErrorCode::TypeMismatch, "no physical base object for member '" + name + "'");
+                    self = static_cast<SelfType*>(native);
                 }
                 else
                 {
-                    if (type_of<SelfType>() != target_type && type_of<SelfType*>() != target_type)
-                    {
-                        RTTI_ERROR((std::string("target must be ") + GetTypeName<SelfType>()).c_str());
-                        return nullptr;
-                    }
+                    Type* targetType = target->GetRttiType();
+                    if (targetType != type_of<SelfType>() && targetType != type_of<SelfType*>())
+                        return Fail(ErrorCode::TypeMismatch, "target type mismatch for value member '" + name + "'");
                     self = Unbox<SelfType*>(target);
                 }
             }
 
-            auto args_tuple = MakeArgs<Args...>(args);
-            if constexpr (std::is_void_v<RET>)
+            auto tuple = detail::MakeArgs<Args...>(arguments);
+            if (!tuple)
             {
-                if constexpr (std::is_member_function_pointer_v<FUNC>)
+                if (GetLastError().code == ErrorCode::None)
+                    Fail(ErrorCode::ArgumentType, "argument conversion failed for '" + name + "'");
+                return false;
+            }
+
+#if RTTI_HAS_EXCEPTIONS
+            try
+            {
+#endif
+                if constexpr (isMemberObject && std::is_void_v<RET>)
                 {
-                    std::apply([=](Args... a)
-                               { std::invoke(f, self, std::forward<Args>(a)...); },
-                               args_tuple);
+                    static_assert(sizeof...(Args) == 1, "a field setter takes exactly one argument");
+                    (self->*function) = std::get<0>(*tuple);
+                    result = nullptr;
+                    return true;
                 }
-                else if constexpr (std::is_member_object_pointer_v<FUNC>)
+                else if constexpr (isMemberObject)
                 {
-                    static_assert(sizeof...(Args) == 1);
-                    (self->*f) = std::get<0>(args_tuple);
+                    static_assert(sizeof...(Args) == 0, "a field getter takes no arguments");
+                    decltype(auto) value = (self->*function);
+                    return detail::StoreReturn<decltype(value)>(std::forward<decltype(value)>(value), result);
                 }
                 else
                 {
-                    std::apply([=](Args... a)
-                               { std::invoke(f, std::forward<Args>(a)...); },
-                               args_tuple);
+                    auto invoke = [&](auto&&... a) -> decltype(auto)
+                    {
+                        if constexpr (std::is_member_function_pointer_v<FUNC>)
+                            return std::invoke(function, self, std::forward<decltype(a)>(a)...);
+                        else
+                            return std::invoke(function, std::forward<decltype(a)>(a)...);
+                    };
+
+                    using ResultType = std::invoke_result_t<decltype(invoke), Args...>;
+                    if constexpr (std::is_void_v<ResultType>)
+                    {
+                        std::apply(
+                            [&](Args... a) { invoke(std::forward<Args>(a)...); }, *tuple);
+                        result = nullptr;
+                        return true;
+                    }
+                    else
+                    {
+                        decltype(auto) value =
+                            std::apply([&](Args... a) -> decltype(auto)
+                                       { return invoke(std::forward<Args>(a)...); },
+                                       *tuple);
+                        return detail::StoreReturn<decltype(value)>(std::forward<decltype(value)>(value), result);
+                    }
                 }
-                return nullptr;
+#if RTTI_HAS_EXCEPTIONS
             }
-            else
+            catch (const Error&)
             {
-                if constexpr (std::is_member_function_pointer_v<FUNC>)
-                {
-                    return std::apply([=](Args... a)
-                                      { return cast<ObjectPtr>(std::invoke(f, self, std::forward<Args>(a)...)); },
-                                      args_tuple);
-                }
-                else if constexpr (std::is_member_object_pointer_v<FUNC>)
-                {
-                    static_assert(sizeof...(Args) == 0);
-                    return cast<ObjectPtr>(self->*f);
-                }
-                else
-                {
-                    return std::apply([=](Args... a)
-                                      { return cast<ObjectPtr>(std::invoke(f, std::forward<Args>(a)...)); },
-                                      args_tuple);
-                }
+                throw;
             }
+            catch (...)
+            {
+                ThrowTargetInvocation(std::current_exception());
+            }
+#endif
         };
 
-        Type* rettype;
-        if constexpr (std::is_void_v<RET>)
-        {
-            rettype = nullptr;
-        }
-        else
-        {
-            rettype = type_of<RET>();
-        }
+        const bool isStatic = !isMember;
+        Type* returnType = nullptr;
+        if constexpr (!std::is_void_v<RET>)
+            returnType = type_of<RET>();
 
-        return new MethodInfo(type_of<Host>(), name, std::is_member_function_pointer_v<FUNC> ? MethodFlags::None : MethodFlags::Static, rettype, {GetParameterInfo<Args>()...}, func, attributes);
+        return std::unique_ptr<MethodInfo>(new MethodInfo(type_of<Host>(), name, isStatic, returnType,
+                                                          { detail::ParameterInfoOf<Args>()... },
+                                                          std::move(callable), attributes));
     }
+
+private:
+    bool m_isStatic = false;
+    Callable m_function;
 };
+
 } // namespace rtti

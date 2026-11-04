@@ -32,7 +32,6 @@ BraceWrapping:
   BeforeElse:            true   
   IndentBraces:          true
   BeforeLambdaBody:      false
-BreakBeforeBraces: Allman
 # > llvm v6.0.0
 BreakInheritanceList: BeforeComma
 AlwaysBreakTemplateDeclarations: Yes

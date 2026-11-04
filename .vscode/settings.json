@@ -132,6 +132,6 @@
     },
     "cmake.configureOnOpen": true,
     //"cmake.configureArgs": [ "-T", "ClangCl" ],
-    "cmake.configureArgs": [ "-D", "RTTI_BUILD_TEST=ON"],
+    "cmake.configureArgs": [ "-D", "RTTI_BUILD_TESTS=ON"],
     "C_Cpp.default.configurationProvider": "vector-of-bool.cmake-tools"
 }
