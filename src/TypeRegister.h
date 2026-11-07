@@ -150,6 +150,14 @@ public:
         return TypeRegister<T>{};
     }
 
+    template <typename I>
+    TypeRegister<T>& interface()
+    {
+        EnsureRegistrationOpen();
+        type_of<T>()->AddInterface(type_of<I>());
+        return *this;
+    }
+
     template <typename... Args>
     TypeRegister<T>& constructor(const std::map<size_t, std::any>& attributes = {})
     {

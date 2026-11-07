@@ -954,6 +954,97 @@ static void test_value_conversions()
 }
 
 // ============================================================================
+// Interface query
+// ============================================================================
+
+class ITestLight : public Interface
+{
+public:
+    virtual int LightValue() const = 0;
+};
+
+class IOtherCapability : public Interface
+{
+public:
+    virtual int Capability() const = 0;
+};
+
+class InterfaceActor : public Object, public ITestLight, public IOtherCapability
+{
+public:
+    RTTI_TYPE_DECLARE(Object, ITestLight, IOtherCapability)
+
+    int LightValue() const override { return 7; }
+    int Capability() const override { return 9; }
+};
+
+class InterfaceDerived : public InterfaceActor
+{
+public:
+    RTTI_TYPE_DECLARE(InterfaceActor)
+};
+
+class PlainActor : public Object
+{
+public:
+    RTTI_TYPE_DECLARE(Object)
+};
+
+class InnerProvider : public ITestLight
+{
+public:
+    explicit InnerProvider(int value) : m_value(value) {}
+    int LightValue() const override { return m_value; }
+private:
+    int m_value;
+};
+
+class InnerActor : public Object
+{
+public:
+    RTTI_TYPE_DECLARE(Object)
+    RTTI_INTERFACE_IMPL(ITestLight, m_provider.get())
+
+    explicit InnerActor(int value) : m_provider(std::make_unique<InnerProvider>(value)) {}
+
+private:
+    std::unique_ptr<InnerProvider> m_provider;
+};
+
+static void test_interface_query()
+{
+    auto actor = MakePtr<InterfaceActor>();
+    EXPECT(type_of<ITestLight>()->IsInterface());
+    EXPECT(type_of<InterfaceActor>()->Implements(type_of<ITestLight>()));
+    EXPECT(type_of<InterfaceActor>()->Implements(type_of<IOtherCapability>()));
+    EXPECT_EQ(type_of<InterfaceActor>()->GetInterfaces().size(), 2u);
+
+    auto* light = actor->As<ITestLight>();
+    auto* other = actor->As<IOtherCapability>();
+    EXPECT(light != nullptr);
+    EXPECT(other != nullptr);
+    EXPECT_EQ(light->LightValue(), 7);
+    EXPECT_EQ(other->Capability(), 9);
+    EXPECT(actor->As<Interface>() == nullptr);
+    EXPECT(actor->As<PlainActor>() == nullptr);
+
+    auto derived = MakePtr<InterfaceDerived>();
+    EXPECT(derived->As<ITestLight>() != nullptr);
+    EXPECT_EQ(derived->As<ITestLight>()->LightValue(), 7);
+    EXPECT(type_of<InterfaceDerived>()->Implements(type_of<ITestLight>()));
+
+    auto plain = MakePtr<PlainActor>();
+    EXPECT(plain->As<ITestLight>() == nullptr);
+
+    TypeRegister<InnerActor>::New().interface<ITestLight>();
+    EXPECT(type_of<InnerActor>()->Implements(type_of<ITestLight>()));
+
+    auto inner = MakePtr<InnerActor>(42);
+    EXPECT(inner->As<ITestLight>() != nullptr);
+    EXPECT_EQ(inner->As<ITestLight>()->LightValue(), 42);
+}
+
+// ============================================================================
 // main
 // ============================================================================
 
@@ -990,6 +1081,7 @@ int main()
     run_test("Threaded type_of", test_threaded_type_of);
     run_test("Try* API", test_try_api);
     run_test("Value conversions", test_value_conversions);
+    run_test("Interface query", test_interface_query);
     run_test("Freezing", test_freezing);
 
     std::printf("\n========================================\n");

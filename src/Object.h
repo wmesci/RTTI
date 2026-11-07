@@ -6,6 +6,13 @@
 namespace rtti
 {
 
+class Interface
+{
+public:
+    using RTTI_INTERFACE_TAG = void;
+    virtual ~Interface() = default;
+};
+
 class Object : public RTTI_OBJECT_BASE
 {
 private:
@@ -22,6 +29,31 @@ public:
     virtual size_t GetHashCode() const { return std::hash<const void*>()(this); }
 
     virtual Type* GetRttiType() const { return type_of<Object>(); }
+
+    /// 查询对象是否实现某个接口，返回调整后的接口指针；默认无接口。
+    virtual void* QueryInterface(Type* interfaceType)
+    {
+        (void)interfaceType;
+        return nullptr;
+    }
+
+    virtual void* QueryInterfaceExt(Type* interfaceType)
+    {
+        (void)interfaceType;
+        return nullptr;
+    }
+
+    template <typename I>
+    I* As()
+    {
+        return static_cast<I*>(QueryInterface(type_of<I>()));
+    }
+
+    template <typename I>
+    const I* As() const
+    {
+        return static_cast<const I*>(const_cast<Object*>(this)->QueryInterface(type_of<I>()));
+    }
 
     // Returns the physical object that should be used when a member declared by
     // `expected` is invoked on this object. Default objects are their own

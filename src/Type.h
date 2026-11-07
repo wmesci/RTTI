@@ -171,6 +171,31 @@ public:
 
     bool IsDynamicType() const noexcept { return HasFlag(TypeFlags::Dynamic); }
 
+    bool IsInterface() const noexcept { return HasFlag(TypeFlags::Interface); }
+
+    void AddInterface(Type* interfaceType)
+    {
+        if (!interfaceType)
+            return;
+        EnsureMetadataMutable();
+        if (Implements(interfaceType))
+            return;
+        m_interfaces.push_back(interfaceType);
+    }
+
+    const std::vector<Type*>& GetInterfaces() const noexcept { return m_interfaces; }
+
+    bool Implements(Type* interfaceType) const
+    {
+        if (!interfaceType)
+            return false;
+        for (Type* current = const_cast<Type*>(this); current != nullptr; current = current->m_baseType)
+            for (Type* implemented : current->m_interfaces)
+                if (implemented == interfaceType)
+                    return true;
+        return false;
+    }
+
     NumericKind GetNumericKind() const noexcept { return m_numericKind; }
 
     const std::map<std::string, ObjectPtr>& GetEnumValues() const { return m_enumValues; }
@@ -680,6 +705,7 @@ private:
     std::vector<std::unique_ptr<ConstructorInfo>> m_constructors;
     std::vector<std::unique_ptr<MethodInfo>> m_methods;
     std::vector<std::unique_ptr<PropertyInfo>> m_properties;
+    std::vector<Type*> m_interfaces;
     std::unordered_map<std::string, MethodInfo*> m_methodIndex;
     std::unordered_map<std::string, PropertyInfo*> m_propertyIndex;
     std::vector<TypeConverter> m_converters;
@@ -1664,6 +1690,19 @@ inline bool try_cast(const From& from, To& out)
         return false;
     out = std::move(result);
     return true;
+}
+
+
+template <typename T>
+inline void RegisterTypeInterfaces(Type* type)
+{
+    if constexpr (requires { typename T::RTTI_INTERFACES; })
+    {
+        []<typename... Interfaces>(InterfaceList<Interfaces...>*, Type* target)
+        {
+            (target->AddInterface(type_of<Interfaces>()), ...);
+        }(static_cast<typename T::RTTI_INTERFACES*>(nullptr), type);
+    }
 }
 
 } // namespace rtti

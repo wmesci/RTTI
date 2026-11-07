@@ -17,6 +17,7 @@ namespace rtti
 
 class Object;
 class ObjectBox;
+class Interface;
 class Type;
 class TypeRegistry;
 class MethodBase;
@@ -111,6 +112,10 @@ using remove_const_ref = std::remove_const_t<std::remove_reference_t<T>>;
 
 template <typename T>
 constexpr bool is_object = std::is_base_of<Object, T>::value;
+
+template <typename T>
+constexpr bool is_interface = std::is_base_of_v<Interface, remove_const_ref<T>> &&
+                              !std::is_base_of_v<Object, remove_const_ref<T>>;
 
 template <typename T>
 struct is_ptr : std::false_type

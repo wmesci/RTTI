@@ -64,6 +64,32 @@ using base_type_t = typename TypeWrapper<T>::base;
 template <typename T>
 Type* type_of();
 
+template <typename T>
+Type* CreateInterfaceType();
+
+template <typename T>
+void RegisterTypeInterfaces(Type* type);
+
+template <typename... Interfaces>
+struct InterfaceList
+{
+};
+
+namespace detail
+{
+template <typename THIS, typename... Interfaces>
+inline void* QueryDirect(THIS* self, Type* interfaceType)
+{
+    void* result = nullptr;
+    const bool matched = ((interfaceType == type_of<Interfaces>()
+          ? (result = static_cast<Interfaces*>(self), true)
+          : false) || ...);
+    (void)matched;
+    (void)result;
+    return result;
+}
+} // namespace detail
+
 enum class TypeFlags
 {
     None = 0,
@@ -71,7 +97,8 @@ enum class TypeFlags
     Enum = 2,
     Integral = 4,
     Floating = 8,
-    Dynamic = 16
+    Dynamic = 16,
+    Interface = 32
 };
 
 // Numeric payload description used for erased numeric conversions.
@@ -312,8 +339,19 @@ inline Type* CreateType()
                       "invalid base type: value types use ObjectBox, reference types use their BASE_TYPE");
         static Type* type = RegisterType(GetTypeName<CLS>(), GetShortTypeName<CLS>(), sizeof(CLS), TypeFlags::None,
                                          NumericKind::None, nullptr, nullptr, type_of<BASE>(), false, nullptr, nullptr);
+        RegisterTypeInterfaces<CLS>(type);
         return type;
     }
+}
+
+template <typename T>
+inline Type* CreateInterfaceType()
+{
+    using I = remove_const_ref<T>;
+    static Type* type = RegisterType(GetTypeName<I>(), GetShortTypeName<I>(), 0,
+                                     TypeFlags::Interface, NumericKind::None, nullptr, nullptr,
+                                     nullptr, false, nullptr, nullptr);
+    return type;
 }
 
 template <typename T>
@@ -322,6 +360,10 @@ inline Type* type_of()
     if constexpr (std::is_void_v<T>)
     {
         return nullptr;
+    }
+    else if constexpr (is_interface<remove_const_ref<T>>)
+    {
+        return CreateInterfaceType<remove_const_ref<T>>();
     }
     else
     {
@@ -333,15 +375,37 @@ inline Type* type_of()
     }
 }
 
-#define RTTI_TYPE_DECLARE(...)                                                                     \
-public:                                                                                            \
-    using BASE_TYPE = __VA_ARGS__;                                                                 \
-    static_assert(std::is_base_of_v<::rtti::Object, BASE_TYPE>, "RTTI_TYPE_DECLARE requires a base derived from rtti::Object");                                   \
-    virtual ::rtti::Type* GetRttiType() const override                                             \
-    {                                                                                              \
-        using THIS_TYPE = ::rtti::remove_const_ref<decltype(*this)>;                               \
-        static_assert(std::is_base_of_v<BASE_TYPE, THIS_TYPE>, "RTTI_TYPE_DECLARE base is not a base of this class");                                    \
-        return ::rtti::type_of<THIS_TYPE>();                                                       \
+#define RTTI_QUERY_DIRECT(THIS, ...)                                                   \
+    __VA_OPT__(if (void* rtti_direct = ::rtti::detail::QueryDirect<THIS, __VA_ARGS__>(this, iface)) \
+                   return rtti_direct;)
+
+#define RTTI_TYPE_DECLARE(BASE, ...)                                                   \
+public:                                                                                \
+    using BASE_TYPE = BASE;                                                           \
+    using RTTI_INTERFACES = ::rtti::InterfaceList<__VA_ARGS__>;                      \
+    static_assert(std::is_base_of_v<::rtti::Object, BASE_TYPE>,                        \
+                  "RTTI_TYPE_DECLARE requires a base derived from rtti::Object");      \
+    virtual ::rtti::Type* GetRttiType() const override                                \
+    {                                                                                 \
+        using THIS_TYPE = ::rtti::remove_const_ref<decltype(*this)>;                  \
+        static_assert(std::is_base_of_v<BASE_TYPE, THIS_TYPE>,                         \
+                      "RTTI_TYPE_DECLARE base is not a base of this class");            \
+        return ::rtti::type_of<THIS_TYPE>();                                          \
+    }                                                                                 \
+    virtual void* QueryInterface(::rtti::Type* iface) override                        \
+    {                                                                                 \
+        RTTI_QUERY_DIRECT(::rtti::remove_const_ref<decltype(*this)>, __VA_ARGS__)     \
+        if (void* rtti_ext = this->QueryInterfaceExt(iface))                                 \
+            return rtti_ext;                                                          \
+        return BASE_TYPE::QueryInterface(iface);                                      \
+    }
+
+#define RTTI_INTERFACE_IMPL(INTERFACE, EXPRESSION)                                    \
+    virtual void* QueryInterfaceExt(::rtti::Type* iface) override                     \
+    {                                                                                 \
+        if (iface == ::rtti::type_of<INTERFACE>())                                    \
+            return static_cast<INTERFACE*>(EXPRESSION);                               \
+        return BASE_TYPE::QueryInterfaceExt(iface);                                   \
     }
 
 } // namespace rtti
